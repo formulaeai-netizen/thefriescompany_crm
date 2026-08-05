@@ -14,16 +14,22 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as TrustRouteImport } from './routes/trust'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
+import { Route as AuthenticatedCreditInventoryPurchasesRouteImport } from './routes/_authenticated/credit-inventory-purchases'
 import { Route as AuthenticatedCustomerAnalyticsRouteImport } from './routes/_authenticated/customer-analytics'
 import { Route as AuthenticatedDeliveryCalculatorRouteImport } from './routes/_authenticated/delivery-calculator'
 import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticated/expenses'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
 import { Route as AuthenticatedInvestorRouteImport } from './routes/_authenticated/investor'
+import { Route as AuthenticatedOperationalAlertsRouteImport } from './routes/_authenticated/operational-alerts'
+import { Route as AuthenticatedPaymentRemindersRouteImport } from './routes/_authenticated/payment-reminders'
+import { Route as AuthenticatedPaymentVerificationsRouteImport } from './routes/_authenticated/payment-verifications'
 import { Route as AuthenticatedPnlRouteImport } from './routes/_authenticated/pnl'
 import { Route as AuthenticatedProductionRouteImport } from './routes/_authenticated/production'
 import { Route as AuthenticatedReturnsRouteImport } from './routes/_authenticated/returns'
 import { Route as AuthenticatedSalariesRouteImport } from './routes/_authenticated/salaries'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedStockAuditsRouteImport } from './routes/_authenticated/stock-audits'
+import { Route as AuthenticatedWastageVerificationsRouteImport } from './routes/_authenticated/wastage-verifications'
 import { Route as AuthenticatedWhatsappLogsRouteImport } from './routes/_authenticated/whatsapp-logs'
 import { Route as AuthenticatedInvestorsIndexRouteImport } from './routes/_authenticated/investors.index'
 import { Route as AuthenticatedInvestorsIdRouteImport } from './routes/_authenticated/investors.$id'
@@ -54,6 +60,12 @@ const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCreditInventoryPurchasesRoute =
+  AuthenticatedCreditInventoryPurchasesRouteImport.update({
+    id: '/credit-inventory-purchases',
+    path: '/credit-inventory-purchases',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCustomerAnalyticsRoute =
   AuthenticatedCustomerAnalyticsRouteImport.update({
     id: '/customer-analytics',
@@ -81,6 +93,24 @@ const AuthenticatedInvestorRoute = AuthenticatedInvestorRouteImport.update({
   path: '/investor',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedOperationalAlertsRoute =
+  AuthenticatedOperationalAlertsRouteImport.update({
+    id: '/operational-alerts',
+    path: '/operational-alerts',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPaymentRemindersRoute =
+  AuthenticatedPaymentRemindersRouteImport.update({
+    id: '/payment-reminders',
+    path: '/payment-reminders',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPaymentVerificationsRoute =
+  AuthenticatedPaymentVerificationsRouteImport.update({
+    id: '/payment-verifications',
+    path: '/payment-verifications',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPnlRoute = AuthenticatedPnlRouteImport.update({
   id: '/pnl',
   path: '/pnl',
@@ -106,6 +136,18 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedStockAuditsRoute =
+  AuthenticatedStockAuditsRouteImport.update({
+    id: '/stock-audits',
+    path: '/stock-audits',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWastageVerificationsRoute =
+  AuthenticatedWastageVerificationsRouteImport.update({
+    id: '/wastage-verifications',
+    path: '/wastage-verifications',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedWhatsappLogsRoute =
   AuthenticatedWhatsappLogsRouteImport.update({
     id: '/whatsapp-logs',
@@ -142,16 +184,22 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/trust': typeof TrustRoute
   '/clients': typeof AuthenticatedClientsRoute
+  '/credit-inventory-purchases': typeof AuthenticatedCreditInventoryPurchasesRoute
   '/customer-analytics': typeof AuthenticatedCustomerAnalyticsRoute
   '/delivery-calculator': typeof AuthenticatedDeliveryCalculatorRoute
   '/expenses': typeof AuthenticatedExpensesRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/investor': typeof AuthenticatedInvestorRoute
+  '/operational-alerts': typeof AuthenticatedOperationalAlertsRoute
+  '/payment-reminders': typeof AuthenticatedPaymentRemindersRoute
+  '/payment-verifications': typeof AuthenticatedPaymentVerificationsRoute
   '/pnl': typeof AuthenticatedPnlRoute
   '/production': typeof AuthenticatedProductionRoute
   '/returns': typeof AuthenticatedReturnsRoute
   '/salaries': typeof AuthenticatedSalariesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/stock-audits': typeof AuthenticatedStockAuditsRoute
+  '/wastage-verifications': typeof AuthenticatedWastageVerificationsRoute
   '/whatsapp-logs': typeof AuthenticatedWhatsappLogsRoute
   '/investors/$id': typeof AuthenticatedInvestorsIdRoute
   '/invoices/deleted': typeof AuthenticatedInvoicesDeletedRoute
@@ -162,16 +210,22 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/trust': typeof TrustRoute
   '/clients': typeof AuthenticatedClientsRoute
+  '/credit-inventory-purchases': typeof AuthenticatedCreditInventoryPurchasesRoute
   '/customer-analytics': typeof AuthenticatedCustomerAnalyticsRoute
   '/delivery-calculator': typeof AuthenticatedDeliveryCalculatorRoute
   '/expenses': typeof AuthenticatedExpensesRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/investor': typeof AuthenticatedInvestorRoute
+  '/operational-alerts': typeof AuthenticatedOperationalAlertsRoute
+  '/payment-reminders': typeof AuthenticatedPaymentRemindersRoute
+  '/payment-verifications': typeof AuthenticatedPaymentVerificationsRoute
   '/pnl': typeof AuthenticatedPnlRoute
   '/production': typeof AuthenticatedProductionRoute
   '/returns': typeof AuthenticatedReturnsRoute
   '/salaries': typeof AuthenticatedSalariesRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/stock-audits': typeof AuthenticatedStockAuditsRoute
+  '/wastage-verifications': typeof AuthenticatedWastageVerificationsRoute
   '/whatsapp-logs': typeof AuthenticatedWhatsappLogsRoute
   '/': typeof AuthenticatedIndexRoute
   '/investors/$id': typeof AuthenticatedInvestorsIdRoute
@@ -185,16 +239,22 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/trust': typeof TrustRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
+  '/_authenticated/credit-inventory-purchases': typeof AuthenticatedCreditInventoryPurchasesRoute
   '/_authenticated/customer-analytics': typeof AuthenticatedCustomerAnalyticsRoute
   '/_authenticated/delivery-calculator': typeof AuthenticatedDeliveryCalculatorRoute
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/investor': typeof AuthenticatedInvestorRoute
+  '/_authenticated/operational-alerts': typeof AuthenticatedOperationalAlertsRoute
+  '/_authenticated/payment-reminders': typeof AuthenticatedPaymentRemindersRoute
+  '/_authenticated/payment-verifications': typeof AuthenticatedPaymentVerificationsRoute
   '/_authenticated/pnl': typeof AuthenticatedPnlRoute
   '/_authenticated/production': typeof AuthenticatedProductionRoute
   '/_authenticated/returns': typeof AuthenticatedReturnsRoute
   '/_authenticated/salaries': typeof AuthenticatedSalariesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/stock-audits': typeof AuthenticatedStockAuditsRoute
+  '/_authenticated/wastage-verifications': typeof AuthenticatedWastageVerificationsRoute
   '/_authenticated/whatsapp-logs': typeof AuthenticatedWhatsappLogsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/investors/$id': typeof AuthenticatedInvestorsIdRoute
@@ -209,16 +269,22 @@ export interface FileRouteTypes {
     | '/auth'
     | '/trust'
     | '/clients'
+    | '/credit-inventory-purchases'
     | '/customer-analytics'
     | '/delivery-calculator'
     | '/expenses'
     | '/inventory'
     | '/investor'
+    | '/operational-alerts'
+    | '/payment-reminders'
+    | '/payment-verifications'
     | '/pnl'
     | '/production'
     | '/returns'
     | '/salaries'
     | '/settings'
+    | '/stock-audits'
+    | '/wastage-verifications'
     | '/whatsapp-logs'
     | '/investors/$id'
     | '/invoices/deleted'
@@ -229,16 +295,22 @@ export interface FileRouteTypes {
     | '/auth'
     | '/trust'
     | '/clients'
+    | '/credit-inventory-purchases'
     | '/customer-analytics'
     | '/delivery-calculator'
     | '/expenses'
     | '/inventory'
     | '/investor'
+    | '/operational-alerts'
+    | '/payment-reminders'
+    | '/payment-verifications'
     | '/pnl'
     | '/production'
     | '/returns'
     | '/salaries'
     | '/settings'
+    | '/stock-audits'
+    | '/wastage-verifications'
     | '/whatsapp-logs'
     | '/'
     | '/investors/$id'
@@ -251,16 +323,22 @@ export interface FileRouteTypes {
     | '/auth'
     | '/trust'
     | '/_authenticated/clients'
+    | '/_authenticated/credit-inventory-purchases'
     | '/_authenticated/customer-analytics'
     | '/_authenticated/delivery-calculator'
     | '/_authenticated/expenses'
     | '/_authenticated/inventory'
     | '/_authenticated/investor'
+    | '/_authenticated/operational-alerts'
+    | '/_authenticated/payment-reminders'
+    | '/_authenticated/payment-verifications'
     | '/_authenticated/pnl'
     | '/_authenticated/production'
     | '/_authenticated/returns'
     | '/_authenticated/salaries'
     | '/_authenticated/settings'
+    | '/_authenticated/stock-audits'
+    | '/_authenticated/wastage-verifications'
     | '/_authenticated/whatsapp-logs'
     | '/_authenticated/'
     | '/_authenticated/investors/$id'
@@ -312,6 +390,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/credit-inventory-purchases': {
+      id: '/_authenticated/credit-inventory-purchases'
+      path: '/credit-inventory-purchases'
+      fullPath: '/credit-inventory-purchases'
+      preLoaderRoute: typeof AuthenticatedCreditInventoryPurchasesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/customer-analytics': {
       id: '/_authenticated/customer-analytics'
       path: '/customer-analytics'
@@ -347,6 +432,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvestorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/operational-alerts': {
+      id: '/_authenticated/operational-alerts'
+      path: '/operational-alerts'
+      fullPath: '/operational-alerts'
+      preLoaderRoute: typeof AuthenticatedOperationalAlertsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/payment-reminders': {
+      id: '/_authenticated/payment-reminders'
+      path: '/payment-reminders'
+      fullPath: '/payment-reminders'
+      preLoaderRoute: typeof AuthenticatedPaymentRemindersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/payment-verifications': {
+      id: '/_authenticated/payment-verifications'
+      path: '/payment-verifications'
+      fullPath: '/payment-verifications'
+      preLoaderRoute: typeof AuthenticatedPaymentVerificationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/pnl': {
       id: '/_authenticated/pnl'
       path: '/pnl'
@@ -380,6 +486,20 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/stock-audits': {
+      id: '/_authenticated/stock-audits'
+      path: '/stock-audits'
+      fullPath: '/stock-audits'
+      preLoaderRoute: typeof AuthenticatedStockAuditsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/wastage-verifications': {
+      id: '/_authenticated/wastage-verifications'
+      path: '/wastage-verifications'
+      fullPath: '/wastage-verifications'
+      preLoaderRoute: typeof AuthenticatedWastageVerificationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/whatsapp-logs': {
@@ -422,16 +542,22 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
+  AuthenticatedCreditInventoryPurchasesRoute: typeof AuthenticatedCreditInventoryPurchasesRoute
   AuthenticatedCustomerAnalyticsRoute: typeof AuthenticatedCustomerAnalyticsRoute
   AuthenticatedDeliveryCalculatorRoute: typeof AuthenticatedDeliveryCalculatorRoute
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedInvestorRoute: typeof AuthenticatedInvestorRoute
+  AuthenticatedOperationalAlertsRoute: typeof AuthenticatedOperationalAlertsRoute
+  AuthenticatedPaymentRemindersRoute: typeof AuthenticatedPaymentRemindersRoute
+  AuthenticatedPaymentVerificationsRoute: typeof AuthenticatedPaymentVerificationsRoute
   AuthenticatedPnlRoute: typeof AuthenticatedPnlRoute
   AuthenticatedProductionRoute: typeof AuthenticatedProductionRoute
   AuthenticatedReturnsRoute: typeof AuthenticatedReturnsRoute
   AuthenticatedSalariesRoute: typeof AuthenticatedSalariesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedStockAuditsRoute: typeof AuthenticatedStockAuditsRoute
+  AuthenticatedWastageVerificationsRoute: typeof AuthenticatedWastageVerificationsRoute
   AuthenticatedWhatsappLogsRoute: typeof AuthenticatedWhatsappLogsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedInvestorsIdRoute: typeof AuthenticatedInvestorsIdRoute
@@ -442,16 +568,25 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
+  AuthenticatedCreditInventoryPurchasesRoute:
+    AuthenticatedCreditInventoryPurchasesRoute,
   AuthenticatedCustomerAnalyticsRoute: AuthenticatedCustomerAnalyticsRoute,
   AuthenticatedDeliveryCalculatorRoute: AuthenticatedDeliveryCalculatorRoute,
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedInvestorRoute: AuthenticatedInvestorRoute,
+  AuthenticatedOperationalAlertsRoute: AuthenticatedOperationalAlertsRoute,
+  AuthenticatedPaymentRemindersRoute: AuthenticatedPaymentRemindersRoute,
+  AuthenticatedPaymentVerificationsRoute:
+    AuthenticatedPaymentVerificationsRoute,
   AuthenticatedPnlRoute: AuthenticatedPnlRoute,
   AuthenticatedProductionRoute: AuthenticatedProductionRoute,
   AuthenticatedReturnsRoute: AuthenticatedReturnsRoute,
   AuthenticatedSalariesRoute: AuthenticatedSalariesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedStockAuditsRoute: AuthenticatedStockAuditsRoute,
+  AuthenticatedWastageVerificationsRoute:
+    AuthenticatedWastageVerificationsRoute,
   AuthenticatedWhatsappLogsRoute: AuthenticatedWhatsappLogsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedInvestorsIdRoute: AuthenticatedInvestorsIdRoute,

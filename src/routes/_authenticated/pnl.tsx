@@ -19,6 +19,7 @@ import {
   Cell,
 } from "recharts";
 import { EXPENSE_GROUPS, GROUP_NAMES, GROUP_COLORS } from "@/lib/expense-categories";
+import { CashInHandBreakdownCard } from "@/components/cash-in-hand-breakdown-card";
 
 export const Route = createFileRoute("/_authenticated/pnl")({
   head: () => ({ meta: [{ title: "P&L — TFC CRM" }] }),
@@ -32,13 +33,6 @@ function monthKey(d: Date) {
 function PnlPage() {
   const { data: invoices = [] } = useQuery({ queryKey: ["invoices"], queryFn: fetchInvoices });
   const { data: expenses = [] } = useQuery({ queryKey: ["expenses"], queryFn: fetchExpenses });
-
-  // All-time cash in hand: total collected (Done) − all expenses
-  const allCollected = invoices
-    .filter((i: any) => i.payment_status === "Done")
-    .reduce((s: number, i: any) => s + Number(i.amount), 0);
-  const allExpensesTotal = expenses.reduce((s: number, e: any) => s + Number(e.price), 0);
-  const cashInHand = allCollected - allExpensesTotal;
 
   const today = new Date();
   // Determine months to show: March, April, May, June + current month if newer
@@ -65,7 +59,7 @@ function PnlPage() {
 
   const rows: Row[] = months.map((m) => {
     const monthInvoices = invoices.filter(
-      (i: any) => ((i.delivery_date ?? i.date) ?? "").slice(0, 7) === m,
+      (i: any) => (i.delivery_date ?? i.date ?? "").slice(0, 7) === m,
     );
     const revenue = monthInvoices.reduce((s, i: any) => s + Number(i.amount), 0);
     const collected = monthInvoices
@@ -117,15 +111,7 @@ function PnlPage() {
         </p>
       </div>
 
-      <Card className="border-2 border-primary/40 bg-primary/5">
-        <CardContent className="p-6">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">Cash in Hand</div>
-          <div className={`tabular mt-2 text-4xl font-semibold ${cashInHand >= 0 ? "text-primary" : "text-foreground"}`}>
-            {pkr(cashInHand)}
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">Total collected minus all expenses to date</p>
-        </CardContent>
-      </Card>
+      <CashInHandBreakdownCard />
 
       <Card>
         <CardHeader>
@@ -138,7 +124,9 @@ function PnlPage() {
                 <tr className="border-b border-border">
                   <th className="px-4 py-3 text-left">Metric</th>
                   {rows.map((r) => (
-                    <th key={r.month} className="px-4 py-3 text-right">{r.label}</th>
+                    <th key={r.month} className="px-4 py-3 text-right">
+                      {r.label}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -146,7 +134,9 @@ function PnlPage() {
                 <tr className="border-b border-border/40">
                   <td className="px-4 py-3 font-medium">Total Revenue</td>
                   {rows.map((r) => (
-                    <td key={r.month} className="px-4 py-3 text-right">{pkr(r.revenue)}</td>
+                    <td key={r.month} className="px-4 py-3 text-right">
+                      {pkr(r.revenue)}
+                    </td>
                   ))}
                 </tr>
                 <tr className="border-b border-border/40">
@@ -166,7 +156,9 @@ function PnlPage() {
                 <tr className="border-b border-border/40">
                   <td className="px-4 py-3 font-medium">Total Expenses</td>
                   {rows.map((r) => (
-                    <td key={r.month} className="px-4 py-3 text-right">{pkr(r.expenses)}</td>
+                    <td key={r.month} className="px-4 py-3 text-right">
+                      {pkr(r.expenses)}
+                    </td>
                   ))}
                 </tr>
                 <tr className="border-b border-border/40">
@@ -191,8 +183,8 @@ function PnlPage() {
                         r.hasUnknown
                           ? "text-muted-foreground"
                           : r.netCollected >= 0
-                          ? "text-primary"
-                          : "text-foreground"
+                            ? "text-primary"
+                            : "text-foreground"
                       }`}
                     >
                       {r.hasUnknown ? "—" : pkr(r.netCollected)}
@@ -207,24 +199,40 @@ function PnlPage() {
               <article key={r.month} className="rounded-xl border border-border bg-card p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h3 className="font-semibold">{r.label}</h3>
-                  {r.hasUnknown && <Badge variant="outline" className="border-warning/40 text-warning">Needs backfill</Badge>}
+                  {r.hasUnknown && (
+                    <Badge variant="outline" className="border-warning/40 text-warning">
+                      Needs backfill
+                    </Badge>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">Revenue</div>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Revenue
+                    </div>
                     <div className="tabular font-semibold">{pkr(r.revenue)}</div>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">Collected</div>
-                    <div className="tabular font-semibold">{r.hasUnknown ? "—" : pkr(r.collected)}</div>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Collected
+                    </div>
+                    <div className="tabular font-semibold">
+                      {r.hasUnknown ? "—" : pkr(r.collected)}
+                    </div>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">Expenses</div>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Expenses
+                    </div>
                     <div className="tabular font-semibold">{pkr(r.expenses)}</div>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">Net Profit</div>
-                    <div className={`tabular font-semibold ${r.netCollected >= 0 ? "text-primary" : "text-foreground"}`}>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Net Profit
+                    </div>
+                    <div
+                      className={`tabular font-semibold ${r.netCollected >= 0 ? "text-primary" : "text-foreground"}`}
+                    >
                       {r.hasUnknown ? "—" : pkr(r.netCollected)}
                     </div>
                   </div>
@@ -244,15 +252,29 @@ function PnlPage() {
             <ComposedChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />
-              <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <YAxis
+                stroke="var(--muted-foreground)"
+                fontSize={12}
+                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+              />
               <Tooltip
-                contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6 }}
+                contentStyle={{
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                }}
                 formatter={(v: number) => pkr(v)}
               />
               <Legend />
               <Bar dataKey="Revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
               <Bar dataKey="Expenses" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
-              <Line type="monotone" dataKey="Gross Profit" stroke="var(--gold-bright)" strokeWidth={2} dot />
+              <Line
+                type="monotone"
+                dataKey="Gross Profit"
+                stroke="var(--gold-bright)"
+                strokeWidth={2}
+                dot
+              />
             </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
@@ -261,38 +283,66 @@ function PnlPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Current Month — Cost Mix vs Revenue ({new Date(currentKey + "-01").toLocaleDateString("en", { month: "long", year: "numeric" })})
+            Current Month — Cost Mix vs Revenue (
+            {new Date(currentKey + "-01").toLocaleDateString("en", {
+              month: "long",
+              year: "numeric",
+            })}
+            )
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="h-64">
               {breakdownByGroup.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">No expenses recorded this month.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No expenses recorded this month.
+                </p>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={breakdownByGroup} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                    <Pie
+                      data={breakdownByGroup}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={90}
+                      paddingAngle={2}
+                    >
                       {breakdownByGroup.map((d, i) => (
                         <Cell key={i} fill={GROUP_COLORS[d.name as keyof typeof GROUP_COLORS]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => pkr(v)} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)" }} />
+                    <Tooltip
+                      formatter={(v: number) => pkr(v)}
+                      contentStyle={{
+                        background: "var(--card)",
+                        border: "1px solid var(--border)",
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               )}
             </div>
             <div className="space-y-3">
               <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground">Revenue this month</div>
-                <div className="tabular mt-1 text-2xl font-semibold text-primary">{pkr(currentRow?.revenue ?? 0)}</div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Revenue this month
+                </div>
+                <div className="tabular mt-1 text-2xl font-semibold text-primary">
+                  {pkr(currentRow?.revenue ?? 0)}
+                </div>
               </div>
               {breakdownByGroup.map((b) => {
-                const pct = currentRow && currentRow.revenue > 0
-                  ? ((b.value / currentRow.revenue) * 100).toFixed(1)
-                  : "—";
+                const pct =
+                  currentRow && currentRow.revenue > 0
+                    ? ((b.value / currentRow.revenue) * 100).toFixed(1)
+                    : "—";
                 return (
-                  <div key={b.name} className="flex items-center justify-between rounded-md border border-border/60 px-4 py-2">
+                  <div
+                    key={b.name}
+                    className="flex items-center justify-between rounded-md border border-border/60 px-4 py-2"
+                  >
                     <div className="flex items-center gap-2">
                       <span
                         className="inline-block h-3 w-3 rounded-sm"
@@ -313,7 +363,8 @@ function PnlPage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Note: May and June invoices currently show payment status as "Unknown" — collected cash is pending backfill.
+        Note: May and June invoices currently show payment status as "Unknown" — collected cash is
+        pending backfill.
       </p>
     </div>
   );

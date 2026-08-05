@@ -20,6 +20,12 @@ import {
   Wallet,
   Banknote,
   Undo2,
+  BellRing,
+  CheckCircle2,
+  Scale,
+  ClipboardCheck,
+  AlertTriangle,
+  HandCoins,
 } from "lucide-react";
 import { Truck } from "lucide-react";
 import {
@@ -37,6 +43,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
+import { isInvoiceReminderEligible } from "@/lib/invoice-reminders";
 import { useMyRoles } from "@/lib/roles";
 import type { AppRole } from "@/lib/roles";
 const logoSrc = "/logo.png";
@@ -83,6 +90,22 @@ const allItems: NavItem[] = [
     icon: Truck,
     roles: ["admin", "staff"],
   },
+  {
+    section: "Operations",
+    title: "Wastage Verifications",
+    url: "/wastage-verifications",
+    icon: Scale,
+    // Admin-only final approval; Moderator gets a read-only review queue.
+    // Staff submit from Daily Production instead and never see this page.
+    roles: ["admin", "moderator"],
+  },
+  {
+    section: "Operations",
+    title: "Stock Audits",
+    url: "/stock-audits",
+    icon: ClipboardCheck,
+    roles: ["admin", "staff", "moderator"],
+  },
 
   {
     section: "Finance",
@@ -111,6 +134,13 @@ const allItems: NavItem[] = [
   { section: "Finance", title: "P&L", url: "/pnl", icon: LineChart, roles: ["admin"] },
   { section: "Finance", title: "Investors", url: "/investors", icon: TrendingUp, roles: ["admin"] },
   { section: "Finance", title: "Salaries", url: "/salaries", icon: Banknote, roles: ["admin"] },
+  {
+    section: "Finance",
+    title: "Credit Inventory Purchases",
+    url: "/credit-inventory-purchases",
+    icon: HandCoins,
+    roles: ["admin", "staff", "moderator"],
+  },
 
   {
     section: "Signals",
@@ -126,14 +156,38 @@ const allItems: NavItem[] = [
     icon: MessageSquare,
     roles: ["admin"],
   },
+  {
+    section: "Signals",
+    title: "Payment Reminders",
+    url: "/payment-reminders",
+    icon: BellRing,
+    roles: ["admin"],
+  },
+  {
+    section: "Signals",
+    title: "Payment Verifications",
+    url: "/payment-verifications",
+    icon: CheckCircle2,
+    roles: ["admin"],
+  },
+  {
+    section: "Signals",
+    title: "Operational Alerts",
+    url: "/operational-alerts",
+    icon: AlertTriangle,
+    roles: ["admin", "moderator"],
+  },
   { section: "Signals", title: "Settings", url: "/settings", icon: SettingsIcon, roles: ["admin"] },
 ];
 
 const SECTION_ORDER: NavItem["section"][] = ["Overview", "Operations", "Finance", "Signals"];
 
 type InvoiceBadgeRow = {
+  amount?: number | string | null;
+  amount_received?: number | string | null;
   payment_status?: string | null;
   due_date?: string | null;
+  is_deleted?: boolean | null;
 };
 
 export function AppSidebar() {
@@ -147,11 +201,8 @@ export function AppSidebar() {
 
   // Overdue invoices count for the Invoices badge
   const invoicesQ = useQuery({ queryKey: ["invoices"], queryFn: fetchInvoices });
-  const overdueCount = ((invoicesQ.data ?? []) as InvoiceBadgeRow[]).filter(
-    (invoice) =>
-      invoice.payment_status === "Not Done" &&
-      invoice.due_date &&
-      new Date(invoice.due_date) < new Date(),
+  const overdueCount = ((invoicesQ.data ?? []) as InvoiceBadgeRow[]).filter((invoice) =>
+    isInvoiceReminderEligible(invoice),
   ).length;
 
   const prefetchers: Record<string, () => void> = {

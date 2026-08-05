@@ -1,0 +1,35 @@
+{
+  "name": "fryguys-whatsapp-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test src/*.test.ts",
+    "scheduler:status": "tsx src/scheduler-status.ts",
+    "run-once-dry": "tsx src/run-once.ts --dry",
+    "run-once-live": "tsx src/run-once.ts --live",
+    "run-alerts-once-dry": "tsx src/run-alerts-once.ts --dry",
+    "run-alerts-once-live": "tsx src/run-alerts-once.ts --live",
+    "run-credit-reminders-once-dry": "tsx src/run-credit-reminders-once.ts --dry",
+    "run-credit-reminders-once-live": "tsx src/run-credit-reminders-once.ts --live",
+    "simulate-paid-command": "tsx src/simulate-paid-command.ts",
+    "simulate-early-payment": "tsx src/simulate-early-payment.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "dotenv": "^17.2.3",
+    "node-cron": "^4.6.0",
+    "puppeteer": "^24.31.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "@types/qrcode-terminal": "^0.12.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.3"
+  }
+}

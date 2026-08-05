@@ -7,8 +7,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,12 +39,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf";
+import { calculateInvoiceDueDate } from "@/lib/invoice-reminders";
 import { useIsAdmin } from "@/lib/roles";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/invoices/")({
-  head: () => ({ meta: [{ title: "Invoices — TFC CRM" }] }),
+  head: () => ({ meta: [{ title: "Invoices - TFC CRM" }] }),
   component: InvoicesPage,
 });
 
@@ -76,11 +89,15 @@ function InvoicesPage() {
       const cy = now.getFullYear();
       const cm = now.getMonth() + 1;
       const filled = new Set<string>();
-      let y = sy, m = sm;
+      let y = sy,
+        m = sm;
       while (y < cy || (y === cy && m <= cm)) {
         filled.add(`${y}-${String(m).padStart(2, "0")}`);
         m++;
-        if (m > 12) { m = 1; y++; }
+        if (m > 12) {
+          m = 1;
+          y++;
+        }
       }
       return Array.from(filled).sort((a, b) => (a < b ? 1 : -1));
     }
@@ -95,7 +112,10 @@ function InvoicesPage() {
   const filtered = useMemo(() => {
     return invoices.filter((i: any) => {
       if (filter !== "all" && i.payment_status !== filter) return false;
-      if (search && !(`${i.invoice_no} ${i.clients?.legal_name}`.toLowerCase().includes(search.toLowerCase())))
+      if (
+        search &&
+        !`${i.invoice_no} ${i.clients?.legal_name}`.toLowerCase().includes(search.toLowerCase())
+      )
         return false;
       const d = new Date(i.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -112,14 +132,11 @@ function InvoicesPage() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from("invoices").update({ payment_status: status as any }).eq("id", id);
+      const { error } = await supabase
+        .from("invoices")
+        .update({ payment_status: status as any })
+        .eq("id", id);
       if (error) throw error;
-      if (status === "Done") {
-        // Fire-and-forget — don't block UI on Twilio.
-        supabase.functions
-          .invoke("payment-status-webhook", { body: { invoice_id: id } })
-          .catch((e) => console.error("payment-status-webhook failed", e));
-      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
@@ -145,7 +162,10 @@ function InvoicesPage() {
 
   const updateDueDate = useMutation({
     mutationFn: async ({ id, due_date }: { id: string; due_date: string }) => {
-      const { error } = await supabase.from("invoices").update({ due_date } as any).eq("id", id);
+      const { error } = await supabase
+        .from("invoices")
+        .update({ due_date } as any)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -186,12 +206,21 @@ function InvoicesPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Invoices</h1>
-          <p className="mt-1 text-sm text-muted-foreground">All deliveries. Auto-calculates due date = delivery + 15 days.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            All deliveries. Auto-calculates due date = delivery + 15 days.
+          </p>
         </div>
         <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-end md:gap-3">
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full md:w-48" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search..."
+            className="w-full md:w-48"
+          />
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-full md:w-44"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full md:w-44">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="Done">Done</SelectItem>
@@ -202,7 +231,9 @@ function InvoicesPage() {
           </Select>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full md:w-auto"><Plus className="mr-1 h-4 w-4" /> New invoice</Button>
+              <Button className="w-full md:w-auto">
+                <Plus className="mr-1 h-4 w-4" /> New invoice
+              </Button>
             </DialogTrigger>
             <NewInvoiceDialog clients={clients} onDone={() => setOpen(false)} isAdmin={isAdmin} />
           </Dialog>
@@ -211,12 +242,18 @@ function InvoicesPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Label htmlFor="month-filter" className="text-sm font-medium text-muted-foreground">Month</Label>
+          <Label htmlFor="month-filter" className="text-sm font-medium text-muted-foreground">
+            Month
+          </Label>
           <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger id="month-filter" className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="month-filter" className="h-9 w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {monthOptions.map((k) => (
-                <SelectItem key={k} value={k}>{monthLabel(k)}</SelectItem>
+                <SelectItem key={k} value={k}>
+                  {monthLabel(k)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -279,7 +316,9 @@ function InvoicesPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium">{i.clients?.legal_name}</div>
                       {i.branches?.branch_name && (
-                        <div className="text-xs text-muted-foreground">{i.branches.branch_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {i.branches.branch_name}
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{fmtDate(i.date)}</td>
@@ -318,11 +357,21 @@ function InvoicesPage() {
                         </span>
                       )}
                     </td>
-                    <td className="tabular px-4 py-3 text-right font-semibold">{pkr(Number(i.amount))}</td>
-                    <td className="tabular px-4 py-3 text-right text-muted-foreground">{i.weight_kg != null ? `${i.weight_kg} kg` : "—"}</td>
-                    <td className="tabular px-4 py-3 text-right text-muted-foreground">{i.unit_price != null ? `Rs. ${Number(i.unit_price).toLocaleString()}/kg` : "—"}</td>
+                    <td className="tabular px-4 py-3 text-right font-semibold">
+                      {pkr(Number(i.amount))}
+                    </td>
+                    <td className="tabular px-4 py-3 text-right text-muted-foreground">
+                      {i.weight_kg != null ? `${i.weight_kg} kg` : "-"}
+                    </td>
+                    <td className="tabular px-4 py-3 text-right text-muted-foreground">
+                      {i.unit_price != null
+                        ? `Rs. ${Number(i.unit_price).toLocaleString()}/kg`
+                        : "-"}
+                    </td>
                     <td className="px-4 py-3 text-center">
-                      <Badge variant="outline" className={statusBadge(i.payment_status)}>{i.payment_status}</Badge>
+                      <Badge variant="outline" className={statusBadge(i.payment_status)}>
+                        {i.payment_status}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3">
                       {isAdmin && (
@@ -330,7 +379,9 @@ function InvoicesPage() {
                           value={i.payment_status}
                           onValueChange={(v) => updateStatus.mutate({ id: i.id, status: v })}
                         >
-                          <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-8 w-32 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Done">Done</SelectItem>
                             <SelectItem value="Not Done">Not Done</SelectItem>
@@ -351,34 +402,35 @@ function InvoicesPage() {
                         >
                           <FileDown className="h-4 w-4" />
                         </Button>
-                        {isAdmin && <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                              title="Delete invoice"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Archive invoice {i.invoice_no}?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Archive invoice {i.invoice_no} for {pkr(Number(i.amount))}? It will be moved to Deleted Invoices and can be restored later.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteInvoice.mutate(i.id)}
+                        {isAdmin && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                title="Delete invoice"
                               >
-                                Archive
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>}
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Archive invoice {i.invoice_no}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Archive invoice {i.invoice_no} for {pkr(Number(i.amount))}? It
+                                  will be moved to Deleted Invoices and can be restored later.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteInvoice.mutate(i.id)}>
+                                  Archive
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -391,35 +443,50 @@ function InvoicesPage() {
 
       <div className="space-y-3 md:hidden">
         {filtered.length === 0 && (
-          <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No invoices.</CardContent></Card>
+          <Card>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              No invoices.
+            </CardContent>
+          </Card>
         )}
         {filtered.map((i: any) => (
           <div key={i.id} className="space-y-3 rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xs font-bold text-primary break-all">{i.invoice_no}</span>
-              <Badge variant="outline" className={statusBadge(i.payment_status)}>{i.payment_status}</Badge>
+              <span className="font-mono text-xs font-bold text-primary break-all">
+                {i.invoice_no}
+              </span>
+              <Badge variant="outline" className={statusBadge(i.payment_status)}>
+                {i.payment_status}
+              </Badge>
             </div>
             <div className="min-w-0 text-sm font-semibold text-foreground">
               <div className="truncate">{i.clients?.legal_name}</div>
               {i.branches?.branch_name && (
-                <div className="truncate text-xs font-normal text-muted-foreground">{i.branches.branch_name}</div>
+                <div className="truncate text-xs font-normal text-muted-foreground">
+                  {i.branches.branch_name}
+                </div>
               )}
             </div>
             <div className="tabular text-xl font-bold text-primary">{pkr(Number(i.amount))}</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>📅 {fmtDate(i.date)}</span>
-              <span>⏰ Due: {fmtDate(i.due_date)}</span>
+              <span>Date: {fmtDate(i.date)}</span>
+              <span>Due: {fmtDate(i.due_date)}</span>
             </div>
             {(i.weight_kg != null || i.unit_price != null) && (
               <div className="text-xs text-muted-foreground">
                 {i.weight_kg != null ? `${i.weight_kg} kg` : ""}
-                {i.unit_price != null ? ` × Rs. ${Number(i.unit_price).toLocaleString()}/kg` : ""}
+                {i.unit_price != null ? ` x Rs. ${Number(i.unit_price).toLocaleString()}/kg` : ""}
               </div>
             )}
             <div className="flex items-center gap-2 pt-1">
               {isAdmin ? (
-                <Select value={i.payment_status} onValueChange={(v) => updateStatus.mutate({ id: i.id, status: v })}>
-                  <SelectTrigger className="h-9 flex-1 text-xs"><SelectValue /></SelectTrigger>
+                <Select
+                  value={i.payment_status}
+                  onValueChange={(v) => updateStatus.mutate({ id: i.id, status: v })}
+                >
+                  <SelectTrigger className="h-9 flex-1 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Done">Done</SelectItem>
                     <SelectItem value="Not Done">Not Done</SelectItem>
@@ -427,14 +494,25 @@ function InvoicesPage() {
                     <SelectItem value="Unknown">Unknown</SelectItem>
                   </SelectContent>
                 </Select>
-              ) : <div className="flex-1" />}
-              <Button size="icon" variant="ghost" className="h-9 w-9 text-primary hover:bg-primary/10" onClick={() => handleDownload(i)}>
+              ) : (
+                <div className="flex-1" />
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-primary hover:bg-primary/10"
+                onClick={() => handleDownload(i)}
+              >
                 <FileDown className="h-4 w-4" />
               </Button>
               {isAdmin && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-9 w-9 text-destructive hover:bg-destructive/10">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 text-destructive hover:bg-destructive/10"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </AlertDialogTrigger>
@@ -442,12 +520,15 @@ function InvoicesPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Archive invoice {i.invoice_no}?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Archive invoice {i.invoice_no} for {pkr(Number(i.amount))}? It will be moved to Deleted Invoices and can be restored later.
+                        Archive invoice {i.invoice_no} for {pkr(Number(i.amount))}? It will be moved
+                        to Deleted Invoices and can be restored later.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => deleteInvoice.mutate(i.id)}>Archive</AlertDialogAction>
+                      <AlertDialogAction onClick={() => deleteInvoice.mutate(i.id)}>
+                        Archive
+                      </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -460,7 +541,15 @@ function InvoicesPage() {
   );
 }
 
-function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone: () => void; isAdmin: boolean }) {
+function NewInvoiceDialog({
+  clients,
+  onDone,
+  isAdmin,
+}: {
+  clients: any[];
+  onDone: () => void;
+  isAdmin: boolean;
+}) {
   const qc = useQueryClient();
   const [clientId, setClientId] = useState("");
   const [branchId, setBranchId] = useState("");
@@ -522,7 +611,8 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
     if (!clientId) return toast.error("Pick a client");
     if (!item) return toast.error("Pick an item");
     if (wtNum <= 0) return toast.error("Enter weight in kg");
-    if (!finalAmount || finalAmount <= 0) return toast.error("Enter weight + unit price, or a total amount");
+    if (!finalAmount || finalAmount <= 0)
+      return toast.error("Enter weight + unit price, or a total amount");
     const insertPayload: any = {
       client_id: clientId,
       branch_id: branchId || null,
@@ -532,9 +622,14 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
       item,
       date: deliveryDate,
       delivery_date: deliveryDate,
+      due_date: calculateInvoiceDueDate(deliveryDate),
       payment_status: "Not Done",
     };
-    const { data, error } = await supabase.from("invoices").insert(insertPayload).select("invoice_no").single();
+    const { data, error } = await supabase
+      .from("invoices")
+      .insert(insertPayload)
+      .select("invoice_no")
+      .single();
     if (error) return toast.error(error.message);
     toast.success(`Created ${data?.invoice_no ?? "invoice"}`);
     qc.invalidateQueries({ queryKey: ["invoices"] });
@@ -543,20 +638,39 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
 
   return (
     <DialogContent>
-      <DialogHeader><DialogTitle>New invoice</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>New invoice</DialogTitle>
+      </DialogHeader>
       <div className="space-y-4">
         <div>
           <Label>Invoice No.</Label>
-                  <Input value="Auto-generated (TFC-MMYY-001)" readOnly disabled className="font-mono text-muted-foreground" />
+          <Input
+            value="Auto-generated (TFC-MMYY-001)"
+            readOnly
+            disabled
+            className="font-mono text-muted-foreground"
+          />
         </div>
         <div>
           <Label>Client</Label>
-          <Select value={clientId} onValueChange={(v) => { setClientId(v); setBranchId(""); }}>
-            <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+          <Select
+            value={clientId}
+            onValueChange={(v) => {
+              setClientId(v);
+              setBranchId("");
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select client" />
+            </SelectTrigger>
             <SelectContent>
-              {clients.filter((c) => c.client_type === "Paying Client").map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.legal_name}</SelectItem>
-              ))}
+              {clients
+                .filter((c) => c.client_type === "Paying Client")
+                .map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.legal_name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
@@ -564,10 +678,14 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
           <div>
             <Label>Branch</Label>
             <Select value={branchId} onValueChange={setBranchId}>
-              <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select branch" />
+              </SelectTrigger>
               <SelectContent>
                 {branches.map((b: any) => (
-                  <SelectItem key={b.id} value={b.id}>{b.branch_name}</SelectItem>
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.branch_name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -583,8 +701,14 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
                 onChange={(e) => setNewFlavorName(e.target.value)}
                 placeholder="e.g. Fryguys Spicy Curly Fries"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); addProduct.mutate(newFlavorName); }
-                  if (e.key === "Escape") { setAddingNewFlavor(false); setNewFlavorName(""); }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addProduct.mutate(newFlavorName);
+                  }
+                  if (e.key === "Escape") {
+                    setAddingNewFlavor(false);
+                    setNewFlavorName("");
+                  }
                 }}
               />
               <Button
@@ -597,7 +721,10 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => { setAddingNewFlavor(false); setNewFlavorName(""); }}
+                onClick={() => {
+                  setAddingNewFlavor(false);
+                  setNewFlavorName("");
+                }}
               >
                 Cancel
               </Button>
@@ -606,14 +733,21 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
             <Select
               value={item}
               onValueChange={(v) => {
-                if (v === "__add_new__") { setAddingNewFlavor(true); return; }
+                if (v === "__add_new__") {
+                  setAddingNewFlavor(true);
+                  return;
+                }
                 setItem(v);
               }}
             >
-              <SelectTrigger><SelectValue placeholder="Select item / flavor" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select item / flavor" />
+              </SelectTrigger>
               <SelectContent>
                 {products.map((p) => (
-                  <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                  <SelectItem key={p.id} value={p.name}>
+                    {p.name}
+                  </SelectItem>
                 ))}
                 <SelectItem value="__add_new__" className="text-primary font-medium">
                   + Add New Flavor
@@ -642,23 +776,38 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
         </div>
         <div>
           <Label>Unit Price (Rs./kg)</Label>
-          <Input type="number" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} placeholder="e.g. 1250" />
+          <Input
+            type="number"
+            value={unitPrice}
+            onChange={(e) => setUnitPrice(e.target.value)}
+            placeholder="e.g. 1250"
+          />
         </div>
         <div>
           <Label>Total Amount (Rs.)</Label>
           <Input
             type="number"
-            value={overriding ? amountOverride : (computedTotal != null ? String(computedTotal) : "")}
-            onChange={(e) => { setOverriding(true); setAmountOverride(e.target.value); }}
+            value={overriding ? amountOverride : computedTotal != null ? String(computedTotal) : ""}
+            onChange={(e) => {
+              setOverriding(true);
+              setAmountOverride(e.target.value);
+            }}
             placeholder="Auto-calculated"
             className={!overriding ? "text-muted-foreground" : ""}
           />
           {computedTotal != null && !overriding ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              {wtNum} kg × Rs. {upNum.toLocaleString()} = Rs. {computedTotal.toLocaleString()}
+              {wtNum} kg x Rs. {upNum.toLocaleString()} = Rs. {computedTotal.toLocaleString()}
             </p>
           ) : overriding ? (
-            <button type="button" className="mt-1 text-xs text-primary underline" onClick={() => { setOverriding(false); setAmountOverride(""); }}>
+            <button
+              type="button"
+              className="mt-1 text-xs text-primary underline"
+              onClick={() => {
+                setOverriding(false);
+                setAmountOverride("");
+              }}
+            >
               Reset to auto-calculation
             </button>
           ) : null}
@@ -671,7 +820,9 @@ function NewInvoiceDialog({ clients, onDone, isAdmin }: { clients: any[]; onDone
             onChange={(e) => setDeliveryDate(e.target.value)}
           />
         </div>
-        <p className="text-xs text-muted-foreground">Due date auto-set to delivery date + 15 days.</p>
+        <p className="text-xs text-muted-foreground">
+          Due date auto-set to delivery date + 15 days.
+        </p>
         <Button
           onClick={submit}
           disabled={!canSubmit}

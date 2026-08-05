@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
-export type AppRole = "admin" | "staff" | "investor" | "viewer";
+export type AppRole = "admin" | "staff" | "investor" | "moderator";
 
 /**
  * Route → allowed roles. Any authenticated route not listed here defaults to
@@ -22,9 +22,26 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] }> = [
   { prefix: "/pnl", roles: ["admin"] },
   { prefix: "/customer-analytics", roles: ["admin"] },
   { prefix: "/investors", roles: ["admin"] },
+  { prefix: "/payment-reminders", roles: ["admin"] },
+  { prefix: "/payment-verifications", roles: ["admin"] },
   { prefix: "/whatsapp-logs", roles: ["admin"] },
   { prefix: "/salaries", roles: ["admin"] },
   { prefix: "/settings", roles: ["admin"] },
+  // Wastage verification review queue: final approval is Admin-only inside
+  // the page itself; Moderator gets read-only metadata (no image access,
+  // no decision controls). Staff submit from /production instead and never
+  // reach this route.
+  { prefix: "/wastage-verifications", roles: ["admin", "moderator"] },
+  // Stock audits: Staff submit their own count, Moderator submits the
+  // Management count, Admin reconciles/locks. All three need route access;
+  // the page itself restricts which actions each role can take.
+  { prefix: "/stock-audits", roles: ["admin", "moderator", "staff"] },
+  // Operational alerts: Admin/Moderator only, per the locked role matrix.
+  { prefix: "/operational-alerts", roles: ["admin", "moderator"] },
+  // Credit inventory purchases: Admin/Staff can create/edit unpaid rows;
+  // Moderator gets read access (matches the backend SELECT policy). Only
+  // Admin can mark paid/cancel - enforced both in the RPCs and in the UI.
+  { prefix: "/credit-inventory-purchases", roles: ["admin", "staff", "moderator"] },
 ];
 
 export function allowedRolesFor(pathname: string): AppRole[] {
@@ -39,6 +56,7 @@ export function homeForRoles(roles: AppRole[]): string {
   if (roles.includes("admin")) return "/";
   if (roles.includes("staff")) return "/inventory";
   if (roles.includes("investor")) return "/investor";
+  if (roles.includes("moderator")) return "/wastage-verifications";
   return "/auth";
 }
 
@@ -108,4 +126,19 @@ export function useIsStaffOnly() {
   const q = useMyRoles();
   const roles = q.data ?? [];
   return { ...q, isStaffOnly: roles.includes("staff") && !roles.includes("admin") };
+}
+
+export function useIsModerator() {
+  const q = useMyRoles();
+  const roles = q.data ?? [];
+  // A moderator is someone who has the 'moderator' role but not admin -
+  // admin already has full operational access and takes precedence.
+  return { ...q, isModerator: roles.includes("moderator") && !roles.includes("admin") };
+}
+
+/** True for Admin or Moderator - used to gate operational review pages/actions. */
+export function useIsAdminOrModerator() {
+  const q = useMyRoles();
+  const roles = q.data ?? [];
+  return { ...q, isAdminOrModerator: roles.includes("admin") || roles.includes("moderator") };
 }

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/lib/supabase";
 import { pkr } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,9 +33,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Trash2, Plus, Download } from "lucide-react";
+import { Pencil, Trash2, Plus, Download, CheckCircle2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useIsAdmin } from "@/lib/roles";
+import { markSalaryPaid } from "@/lib/salaries.functions";
 
 export const Route = createFileRoute("/_authenticated/salaries")({
   head: () => ({ meta: [{ title: "Salaries — TFC CRM" }] }),
@@ -57,6 +61,9 @@ type SalaryRow = {
   non_paid_holidays: number;
   advance_repaid: number | null;
   repayment_collected_by: string | null;
+  paid: boolean;
+  paid_at: string | null;
+  paid_by: string | null;
 };
 
 type FormState = {
@@ -130,13 +137,47 @@ async function fetchSalaries(): Promise<SalaryRow[]> {
   return (data ?? []) as SalaryRow[];
 }
 
+async function fetchProfileNames(ids: string[]): Promise<Record<string, string>> {
+  if (ids.length === 0) return {};
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", ids);
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  for (const p of data ?? []) map[p.id] = p.full_name || p.email || p.id;
+  return map;
+}
+
 function SalariesPage() {
   const qc = useQueryClient();
+  const { isAdmin } = useIsAdmin();
   const { data: rows = [] } = useQuery({ queryKey: ["employee_salaries"], queryFn: fetchSalaries });
   const [monthFilter, setMonthFilter] = useState<string>(currentMonthKey());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<SalaryRow | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+
+  const paidByIds = useMemo(
+    () => [...new Set(rows.map((r) => r.paid_by).filter((id): id is string => !!id))],
+    [rows],
+  );
+  const { data: paidByNames = {} } = useQuery({
+    queryKey: ["salary-paid-by-names", paidByIds],
+    queryFn: () => fetchProfileNames(paidByIds),
+    enabled: paidByIds.length > 0,
+  });
+
+  const markPaidFn = useServerFn(markSalaryPaid);
+  const markPaidMut = useMutation({
+    mutationFn: (salaryId: string) => markPaidFn({ data: { salary_id: salaryId } }),
+    onSuccess: () => {
+      toast.success("Salary marked as paid");
+      qc.invalidateQueries({ queryKey: ["employee_salaries"] });
+      qc.invalidateQueries({ queryKey: ["cash-in-hand-summary"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Could not mark salary paid"),
+  });
 
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
@@ -145,10 +186,7 @@ function SalariesPage() {
     return Array.from(set).sort().reverse();
   }, [rows]);
 
-  const monthRows = useMemo(
-    () => rows.filter((r) => r.month === monthFilter),
-    [rows, monthFilter],
-  );
+  const monthRows = useMemo(() => rows.filter((r) => r.month === monthFilter), [rows, monthFilter]);
 
   // Live preview of calculated fields
   const preview = useMemo(() => {
@@ -247,7 +285,10 @@ function SalariesPage() {
       repayment_collected_by: form.repayment_collected_by.trim() || null,
     };
     if (editing) {
-      const { error } = await supabase.from("employee_salaries").update(payload).eq("id", editing.id);
+      const { error } = await supabase
+        .from("employee_salaries")
+        .update(payload)
+        .eq("id", editing.id);
       if (error) return toast.error(error.message);
       toast.success("Salary updated");
     } else {
@@ -268,24 +309,52 @@ function SalariesPage() {
 
   function exportCsv() {
     const headers = [
-      "S.No","Employee ID","Employee Name","Designation","Department",
-      "Total Working Days","Basic Salary","Gross Salary","Income Tax",
-      "Absent Days","Total Deductions","Advance Taken","Advance Balance",
-      "Non-Paid Holidays","Days Actually Worked","Net Salary",
-      "Advance Repaid","Repayment Collected By",
+      "S.No",
+      "Employee ID",
+      "Employee Name",
+      "Designation",
+      "Department",
+      "Total Working Days",
+      "Basic Salary",
+      "Gross Salary",
+      "Income Tax",
+      "Absent Days",
+      "Total Deductions",
+      "Advance Taken",
+      "Advance Balance",
+      "Non-Paid Holidays",
+      "Days Actually Worked",
+      "Net Salary",
+      "Advance Repaid",
+      "Repayment Collected By",
     ];
     const lines = [headers.join(",")];
     monthRows.forEach((r, i) => {
       const ded = calcDeductions(n(r.gross_salary), n(r.total_working_days), n(r.absent_days));
       const dw = calcDaysWorked(n(r.total_working_days), n(r.absent_days), n(r.non_paid_holidays));
       const net = calcNet(n(r.gross_salary), n(r.income_tax), ded, n(r.advance_taken));
-      lines.push([
-        i + 1, r.employee_id, `"${r.employee_name}"`, `"${r.designation ?? ""}"`, `"${r.department ?? ""}"`,
-        r.total_working_days, r.basic_salary, r.gross_salary, r.income_tax,
-        r.absent_days, ded, r.advance_taken, r.advance_balance,
-        r.non_paid_holidays, dw, net,
-        r.advance_repaid ?? "", `"${r.repayment_collected_by ?? ""}"`,
-      ].join(","));
+      lines.push(
+        [
+          i + 1,
+          r.employee_id,
+          `"${r.employee_name}"`,
+          `"${r.designation ?? ""}"`,
+          `"${r.department ?? ""}"`,
+          r.total_working_days,
+          r.basic_salary,
+          r.gross_salary,
+          r.income_tax,
+          r.absent_days,
+          ded,
+          r.advance_taken,
+          r.advance_balance,
+          r.non_paid_holidays,
+          dw,
+          net,
+          r.advance_repaid ?? "",
+          `"${r.repayment_collected_by ?? ""}"`,
+        ].join(","),
+      );
     });
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -310,7 +379,9 @@ function SalariesPage() {
             </SelectTrigger>
             <SelectContent>
               {monthOptions.map((m) => (
-                <SelectItem key={m} value={m}>{monthLabel(m)}</SelectItem>
+                <SelectItem key={m} value={m}>
+                  {monthLabel(m)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -331,17 +402,42 @@ function SalariesPage() {
           <table className="min-w-full text-xs">
             <thead>
               <tr className="bg-[#0A0F1E] text-amber-300/90 uppercase tracking-wider">
-                <th className="p-2 text-left" rowSpan={2}>S.No</th>
-                <th className="p-2 text-left" rowSpan={2}>Emp ID</th>
-                <th className="p-2 text-left" rowSpan={2}>Employee Name</th>
-                <th className="p-2 text-left" rowSpan={2}>Designation</th>
-                <th className="p-2 text-left" rowSpan={2}>Department</th>
-                <th className="p-2 text-center" rowSpan={2}>Working Days</th>
-                <th className="p-2 text-center border-l border-white/10" colSpan={3}>Earnings / Allowances</th>
-                <th className="p-2 text-center border-l border-white/10" colSpan={4}>Attendance</th>
-                <th className="p-2 text-center border-l border-white/10" colSpan={2}>Advance</th>
-                <th className="p-2 text-center border-l border-white/10" rowSpan={2}>Net Salary</th>
-                <th className="p-2 text-center border-l border-white/10" rowSpan={2}>Actions</th>
+                <th className="p-2 text-left" rowSpan={2}>
+                  S.No
+                </th>
+                <th className="p-2 text-left" rowSpan={2}>
+                  Emp ID
+                </th>
+                <th className="p-2 text-left" rowSpan={2}>
+                  Employee Name
+                </th>
+                <th className="p-2 text-left" rowSpan={2}>
+                  Designation
+                </th>
+                <th className="p-2 text-left" rowSpan={2}>
+                  Department
+                </th>
+                <th className="p-2 text-center" rowSpan={2}>
+                  Working Days
+                </th>
+                <th className="p-2 text-center border-l border-white/10" colSpan={3}>
+                  Earnings / Allowances
+                </th>
+                <th className="p-2 text-center border-l border-white/10" colSpan={4}>
+                  Attendance
+                </th>
+                <th className="p-2 text-center border-l border-white/10" colSpan={2}>
+                  Advance
+                </th>
+                <th className="p-2 text-center border-l border-white/10" rowSpan={2}>
+                  Net Salary
+                </th>
+                <th className="p-2 text-center border-l border-white/10" rowSpan={2}>
+                  Payment Status
+                </th>
+                <th className="p-2 text-center border-l border-white/10" rowSpan={2}>
+                  Actions
+                </th>
               </tr>
               <tr className="bg-[#0A0F1E]/80 text-amber-200/70">
                 <th className="p-2 text-right border-l border-white/10">Basic</th>
@@ -358,14 +454,22 @@ function SalariesPage() {
             <tbody className="text-white/90">
               {monthRows.length === 0 && (
                 <tr>
-                  <td colSpan={17} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={18} className="p-8 text-center text-muted-foreground">
                     No salary records for {monthLabel(monthFilter)}.
                   </td>
                 </tr>
               )}
               {monthRows.map((r, i) => {
-                const ded = calcDeductions(n(r.gross_salary), n(r.total_working_days), n(r.absent_days));
-                const dw = calcDaysWorked(n(r.total_working_days), n(r.absent_days), n(r.non_paid_holidays));
+                const ded = calcDeductions(
+                  n(r.gross_salary),
+                  n(r.total_working_days),
+                  n(r.absent_days),
+                );
+                const dw = calcDaysWorked(
+                  n(r.total_working_days),
+                  n(r.absent_days),
+                  n(r.non_paid_holidays),
+                );
                 const net = calcNet(n(r.gross_salary), n(r.income_tax), ded, n(r.advance_taken));
                 return (
                   <tr key={r.id} className="border-t border-white/5 hover:bg-white/[0.02]">
@@ -375,16 +479,72 @@ function SalariesPage() {
                     <td className="p-2 text-white/70">{r.designation}</td>
                     <td className="p-2 text-white/70">{r.department}</td>
                     <td className="p-2 text-center">{r.total_working_days}</td>
-                    <td className="p-2 text-right border-l border-white/10">{pkr(r.basic_salary)}</td>
+                    <td className="p-2 text-right border-l border-white/10">
+                      {pkr(r.basic_salary)}
+                    </td>
                     <td className="p-2 text-right">{pkr(r.gross_salary)}</td>
                     <td className="p-2 text-right">{pkr(r.income_tax)}</td>
                     <td className="p-2 text-center border-l border-white/10">{r.absent_days}</td>
                     <td className="p-2 text-right text-red-300/90">{pkr(ded)}</td>
                     <td className="p-2 text-center">{r.non_paid_holidays}</td>
                     <td className="p-2 text-center">{dw}</td>
-                    <td className="p-2 text-right border-l border-white/10">{pkr(r.advance_taken)}</td>
+                    <td className="p-2 text-right border-l border-white/10">
+                      {pkr(r.advance_taken)}
+                    </td>
                     <td className="p-2 text-right">{pkr(r.advance_balance)}</td>
-                    <td className="p-2 text-right border-l border-white/10 font-semibold text-amber-300">{pkr(net)}</td>
+                    <td className="p-2 text-right border-l border-white/10 font-semibold text-amber-300">
+                      {pkr(net)}
+                    </td>
+                    <td className="p-2 text-center border-l border-white/10">
+                      {r.paid ? (
+                        <div>
+                          <Badge variant="outline" className="border-success/30 text-success">
+                            Paid
+                          </Badge>
+                          <div className="mt-1 text-[10px] text-muted-foreground">
+                            {r.paid_at ? new Date(r.paid_at).toLocaleString() : ""}
+                            {r.paid_by && paidByNames[r.paid_by]
+                              ? ` by ${paidByNames[r.paid_by]}`
+                              : ""}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1">
+                          <Badge variant="outline" className="border-warning/30 text-warning">
+                            Unpaid
+                          </Badge>
+                          {isAdmin && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={markPaidMut.isPending}
+                                >
+                                  <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Mark Paid
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Mark salary as paid?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This marks {r.employee_name}'s {monthLabel(r.month)} salary (
+                                    {pkr(net)}) as paid and includes it in Cash in Hand's
+                                    paid-salaries total. This cannot be undone from here.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => markPaidMut.mutate(r.id)}>
+                                    Mark Paid
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-2 text-center border-l border-white/10">
                       <div className="flex items-center justify-center gap-1">
                         <Button size="icon" variant="ghost" onClick={() => openEdit(r)}>
@@ -405,7 +565,9 @@ function SalariesPage() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => remove(r.id)}>Delete</AlertDialogAction>
+                              <AlertDialogAction onClick={() => remove(r.id)}>
+                                Delete
+                              </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
@@ -416,18 +578,27 @@ function SalariesPage() {
               })}
               {monthRows.length > 0 && (
                 <tr className="border-t-2 border-amber-500/40 bg-[#0A0F1E]/60 font-semibold text-amber-200">
-                  <td className="p-2" colSpan={5}>TOTAL</td>
+                  <td className="p-2" colSpan={5}>
+                    TOTAL
+                  </td>
                   <td className="p-2 text-center">{totals.total_working_days}</td>
-                  <td className="p-2 text-right border-l border-white/10">{pkr(totals.basic_salary)}</td>
+                  <td className="p-2 text-right border-l border-white/10">
+                    {pkr(totals.basic_salary)}
+                  </td>
                   <td className="p-2 text-right">{pkr(totals.gross_salary)}</td>
                   <td className="p-2 text-right">{pkr(totals.income_tax)}</td>
                   <td className="p-2 text-center border-l border-white/10">{totals.absent_days}</td>
                   <td className="p-2 text-right">{pkr(totals.total_deductions)}</td>
                   <td className="p-2 text-center">{totals.non_paid_holidays}</td>
                   <td className="p-2 text-center">{totals.days_worked}</td>
-                  <td className="p-2 text-right border-l border-white/10">{pkr(totals.advance_taken)}</td>
+                  <td className="p-2 text-right border-l border-white/10">
+                    {pkr(totals.advance_taken)}
+                  </td>
                   <td className="p-2 text-right">{pkr(totals.advance_balance)}</td>
-                  <td className="p-2 text-right border-l border-white/10 text-amber-300">{pkr(totals.net_salary)}</td>
+                  <td className="p-2 text-right border-l border-white/10 text-amber-300">
+                    {pkr(totals.net_salary)}
+                  </td>
+                  <td className="p-2 border-l border-white/10" />
                   <td className="p-2 border-l border-white/10" />
                 </tr>
               )}
@@ -444,20 +615,85 @@ function SalariesPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Employee ID" value={form.employee_id} onChange={(v) => setForm({ ...form, employee_id: v })} />
-            <Field label="Employee Name" value={form.employee_name} onChange={(v) => setForm({ ...form, employee_name: v })} />
-            <Field label="Designation" value={form.designation} onChange={(v) => setForm({ ...form, designation: v })} />
-            <Field label="Department" value={form.department} onChange={(v) => setForm({ ...form, department: v })} />
-            <Field label="Total Working Days" type="number" value={form.total_working_days} onChange={(v) => setForm({ ...form, total_working_days: v })} />
-            <Field label="Basic Salary" type="number" value={form.basic_salary} onChange={(v) => setForm({ ...form, basic_salary: v })} />
-            <Field label="Gross Salary" type="number" value={form.gross_salary} onChange={(v) => setForm({ ...form, gross_salary: v })} />
-            <Field label="Income Tax" type="number" value={form.income_tax} onChange={(v) => setForm({ ...form, income_tax: v })} />
-            <Field label="Absent Days" type="number" value={form.absent_days} onChange={(v) => setForm({ ...form, absent_days: v })} />
-            <Field label="Non-Paid Holidays (Sun+Eid)" type="number" value={form.non_paid_holidays} onChange={(v) => setForm({ ...form, non_paid_holidays: v })} />
-            <Field label="Advance Taken" type="number" value={form.advance_taken} onChange={(v) => setForm({ ...form, advance_taken: v })} />
-            <Field label="Advance Balance" type="number" value={form.advance_balance} onChange={(v) => setForm({ ...form, advance_balance: v })} />
-            <Field label="Advance Repaid This Month (optional)" type="number" value={form.advance_repaid} onChange={(v) => setForm({ ...form, advance_repaid: v })} />
-            <Field label="Repayment Collected By (optional)" value={form.repayment_collected_by} onChange={(v) => setForm({ ...form, repayment_collected_by: v })} />
+            <Field
+              label="Employee ID"
+              value={form.employee_id}
+              onChange={(v) => setForm({ ...form, employee_id: v })}
+            />
+            <Field
+              label="Employee Name"
+              value={form.employee_name}
+              onChange={(v) => setForm({ ...form, employee_name: v })}
+            />
+            <Field
+              label="Designation"
+              value={form.designation}
+              onChange={(v) => setForm({ ...form, designation: v })}
+            />
+            <Field
+              label="Department"
+              value={form.department}
+              onChange={(v) => setForm({ ...form, department: v })}
+            />
+            <Field
+              label="Total Working Days"
+              type="number"
+              value={form.total_working_days}
+              onChange={(v) => setForm({ ...form, total_working_days: v })}
+            />
+            <Field
+              label="Basic Salary"
+              type="number"
+              value={form.basic_salary}
+              onChange={(v) => setForm({ ...form, basic_salary: v })}
+            />
+            <Field
+              label="Gross Salary"
+              type="number"
+              value={form.gross_salary}
+              onChange={(v) => setForm({ ...form, gross_salary: v })}
+            />
+            <Field
+              label="Income Tax"
+              type="number"
+              value={form.income_tax}
+              onChange={(v) => setForm({ ...form, income_tax: v })}
+            />
+            <Field
+              label="Absent Days"
+              type="number"
+              value={form.absent_days}
+              onChange={(v) => setForm({ ...form, absent_days: v })}
+            />
+            <Field
+              label="Non-Paid Holidays (Sun+Eid)"
+              type="number"
+              value={form.non_paid_holidays}
+              onChange={(v) => setForm({ ...form, non_paid_holidays: v })}
+            />
+            <Field
+              label="Advance Taken"
+              type="number"
+              value={form.advance_taken}
+              onChange={(v) => setForm({ ...form, advance_taken: v })}
+            />
+            <Field
+              label="Advance Balance"
+              type="number"
+              value={form.advance_balance}
+              onChange={(v) => setForm({ ...form, advance_balance: v })}
+            />
+            <Field
+              label="Advance Repaid This Month (optional)"
+              type="number"
+              value={form.advance_repaid}
+              onChange={(v) => setForm({ ...form, advance_repaid: v })}
+            />
+            <Field
+              label="Repayment Collected By (optional)"
+              value={form.repayment_collected_by}
+              onChange={(v) => setForm({ ...form, repayment_collected_by: v })}
+            />
           </div>
 
           <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
@@ -479,7 +715,9 @@ function SalariesPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button className="bg-amber-500 hover:bg-amber-600 text-black" onClick={save}>
               {editing ? "Save changes" : "Add employee"}
             </Button>
