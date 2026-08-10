@@ -50,15 +50,29 @@ export function buildNoOutstandingInvoiceReply(clientName: string): string {
   ].join("\n");
 }
 
-/** Sent when a known client has more than one open invoice - never guesses which one. */
-export function buildMultipleOpenInvoicesReply(clientName: string): string {
+export type OpenInvoicePaymentOption = {
+  invoiceNumber: string;
+  outstandingAmount: number;
+};
+
+/** Sent when a known client has more than one open invoice - lists exact options, never guesses which was paid. */
+export function buildMultipleOpenInvoicesReply(
+  clientName: string,
+  invoices: OpenInvoicePaymentOption[],
+): string {
+  const invoiceLines = invoices.flatMap((invoice, index) => [
+    `${index + 1}. Invoice ID: ${invoice.invoiceNumber}`,
+    `   Amount: Rs. ${formatMoney(invoice.outstandingAmount)}`,
+    `   Reply: PAID ${Math.round(invoice.outstandingAmount)} ${invoice.invoiceNumber}`,
+  ]);
+
   return [
     `Assalam-o-Alaikum ${clientName}.`,
     "",
     "Aapki ek se zyada outstanding invoices hain.",
-    "Payment confirm karne ke liye, apni invoice ya reminder message mein diya gaya exact Invoice ID istemal karein:",
+    "Agar payment ho gayi hai to jis invoice ki payment ki hai, uski exact line copy karke bhej dein:",
     "",
-    "PAID <Amount> <Invoice-ID>",
+    ...invoiceLines,
   ].join("\n");
 }
 

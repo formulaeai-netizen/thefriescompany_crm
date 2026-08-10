@@ -227,10 +227,10 @@ test("no open invoice returns a safe no-outstanding-invoice reply", async () => 
   }
 });
 
-test("multiple open invoices never guesses - asks for the exact invoice ID instead", async () => {
+test("multiple open invoices lists exact invoice IDs, amounts and commands", async () => {
   const repo = new MemoryInboundRepository(client, [
     openInvoice,
-    { ...openInvoice, id: "invoice-2", invoice_no: "INV-1024" },
+    { ...openInvoice, id: "invoice-2", invoice_no: "INV-1024", amount: 12500 },
   ]);
   const result = await handleIncomingPaymentMessage(
     repo,
@@ -241,8 +241,12 @@ test("multiple open invoices never guesses - asks for the exact invoice ID inste
   assert.equal(result.kind, "early_payment_reply");
   if (result.kind === "early_payment_reply") {
     assert.equal(result.invoiceCount, 2);
-    assert.doesNotMatch(result.reply, /INV-1023/);
-    assert.match(result.reply, /exact Invoice ID/i);
+    assert.match(result.reply, /Invoice ID: INV-1023/);
+    assert.match(result.reply, /Amount: Rs\. 25,000/);
+    assert.match(result.reply, /PAID 25000 INV-1023/);
+    assert.match(result.reply, /Invoice ID: INV-1024/);
+    assert.match(result.reply, /Amount: Rs\. 12,500/);
+    assert.match(result.reply, /PAID 12500 INV-1024/);
   }
 });
 

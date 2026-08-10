@@ -41,10 +41,19 @@ test("no-outstanding-invoice reply never fabricates an invoice", () => {
   assert.doesNotMatch(body, /INV-/);
 });
 
-test("multiple-open-invoices reply never guesses a specific invoice", () => {
-  const body = buildMultipleOpenInvoicesReply("Testing Dev");
-  assert.doesNotMatch(body, /INV-\d/);
-  assert.match(body, /exact Invoice ID/i);
+test("multiple-open-invoices reply lists invoice IDs, amounts and exact commands", () => {
+  const body = buildMultipleOpenInvoicesReply("Testing Dev", [
+    { invoiceNumber: "INV-1023", outstandingAmount: 25000 },
+    { invoiceNumber: "INV-1024", outstandingAmount: 12500 },
+  ]);
+
+  assert.match(body, /Testing Dev/);
+  assert.match(body, /Invoice ID: INV-1023/);
+  assert.match(body, /Amount: Rs\. 25,000/);
+  assert.match(body, /Reply: PAID 25000 INV-1023/);
+  assert.match(body, /Invoice ID: INV-1024/);
+  assert.match(body, /Amount: Rs\. 12,500/);
+  assert.match(body, /Reply: PAID 12500 INV-1024/);
 });
 
 test("invalid-command guidance shows the exact required format", () => {

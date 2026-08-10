@@ -293,7 +293,13 @@ async function handleEarlyPaymentMessage(
   if (invoices.length > 1) {
     return {
       kind: "early_payment_reply",
-      reply: buildMultipleOpenInvoicesReply(clientName),
+      reply: buildMultipleOpenInvoicesReply(
+        clientName,
+        invoices.map((invoice) => ({
+          invoiceNumber: invoice.invoice_no ?? "invoice",
+          outstandingAmount: calculateOutstanding(invoice),
+        })),
+      ),
       invoiceCount: invoices.length,
     };
   }
