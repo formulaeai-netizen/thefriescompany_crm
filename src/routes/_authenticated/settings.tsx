@@ -50,10 +50,7 @@ function SettingsPage() {
   const save = async () => {
     if (!form.id) return toast.error("Settings row not loaded yet");
     const { id, created_at, updated_at, ...rest } = form;
-    const { error } = await supabase
-      .from("settings")
-      .update({ ...rest, updated_at: new Date().toISOString() })
-      .eq("id", id);
+    const { error } = await supabase.from("settings").update(rest).eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Settings saved");
     qc.invalidateQueries({ queryKey: ["settings"] });
