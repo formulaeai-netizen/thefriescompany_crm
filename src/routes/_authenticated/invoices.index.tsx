@@ -33,8 +33,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { useMemo, useState } from "react";
-import { Plus, FileDown, Trash2, CalendarIcon, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useMemo, useRef, useState } from "react";
+import { Plus, FileDown, FileUp, Trash2, CalendarIcon, X, Download } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
@@ -43,6 +50,7 @@ import { calculateInvoiceDueDate } from "@/lib/invoice-reminders";
 import { useIsAdmin } from "@/lib/roles";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { downloadCsv, parseCsvToRecords, toCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/invoices/")({
   head: () => ({ meta: [{ title: "Invoices - TFC CRM" }] }),
@@ -57,6 +65,47 @@ function statusBadge(s: string) {
     Unknown: "bg-muted text-muted-foreground border-border",
   };
   return map[s] ?? "";
+}
+
+const EXPORT_HEADERS = [
+  "Invoice No",
+  "Client",
+  "Branch",
+  "Item",
+  "Date",
+  "Due Date",
+  "Weight (kg)",
+  "Unit Price",
+  "Amount",
+  "Amount Received",
+  "Payment Status",
+];
+
+function invoiceToCsvRow(i: any): Array<string | number | null> {
+  return [
+    i.invoice_no ?? "",
+    i.clients?.legal_name ?? "",
+    i.branches?.branch_name ?? "",
+    i.item ?? "",
+    i.date ? String(i.date).slice(0, 10) : "",
+    i.due_date ? String(i.due_date).slice(0, 10) : "",
+    i.weight_kg ?? "",
+    i.unit_price ?? "",
+    i.amount ?? "",
+    i.amount_received ?? "",
+    i.payment_status ?? "",
+  ];
+}
+
+function exportInvoicesCsv(rows: any[], filenamePrefix: string) {
+  if (rows.length === 0) {
+    toast.error("Nothing to export");
+    return;
+  }
+  const csv = toCsv(EXPORT_HEADERS, rows.map(invoiceToCsvRow));
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadCsv(`${filenamePrefix}-${stamp}.csv`, csv);
+  toast.success(`Exported ${rows.length} invoice${rows.length === 1 ? "" : "s"}`);
 }
 
 function InvoicesPage() {
@@ -74,6 +123,8 @@ function InvoicesPage() {
   }, []);
   const [monthFilter, setMonthFilter] = useState<string>(currentMonthKey);
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [importOpen, setImportOpen] = useState(false);
 
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
@@ -129,6 +180,33 @@ function InvoicesPage() {
   }, [invoices, filter, search, monthFilter, dateFilter]);
 
   const total = filtered.reduce((s: number, i: any) => s + Number(i.amount), 0);
+
+  const selectedRows = useMemo(
+    () => (invoices as any[]).filter((i: any) => selected.has(i.id)),
+    [invoices, selected],
+  );
+  const allFilteredSelected = filtered.length > 0 && filtered.every((i: any) => selected.has(i.id));
+  const someFilteredSelected = filtered.some((i: any) => selected.has(i.id));
+
+  const toggleRow = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleAllFiltered = (checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const i of filtered as any[]) {
+        if (checked) next.add(i.id);
+        else next.delete(i.id);
+      }
+      return next;
+    });
+  };
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -229,6 +307,31 @@ function InvoicesPage() {
               <SelectItem value="Unknown">Unknown</SelectItem>
             </SelectContent>
           </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full md:w-auto">
+                <FileDown className="mr-1 h-4 w-4" /> Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportInvoicesCsv(filtered, "invoices-all")}>
+                Export All ({filtered.length})
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={selectedRows.length === 0}
+                onClick={() => exportInvoicesCsv(selectedRows, "invoices-selected")}
+              >
+                Export Selected ({selectedRows.length})
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="outline"
+            className="w-full md:w-auto"
+            onClick={() => setImportOpen(true)}
+          >
+            <FileUp className="mr-1 h-4 w-4" /> Import
+          </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="w-full md:w-auto">
@@ -239,6 +342,13 @@ function InvoicesPage() {
           </Dialog>
         </div>
       </div>
+
+      <ImportInvoicesDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        clients={clients}
+        onImported={() => qc.invalidateQueries({ queryKey: ["invoices"] })}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -297,6 +407,15 @@ function InvoicesPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-card text-xs uppercase tracking-wider text-muted-foreground">
                 <tr className="border-b border-border">
+                  <th className="w-10 px-4 py-3 text-left">
+                    <Checkbox
+                      checked={
+                        allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false
+                      }
+                      onCheckedChange={(v) => toggleAllFiltered(!!v)}
+                      aria-label="Select all filtered invoices"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left">Invoice</th>
                   <th className="px-4 py-3 text-left">Client / Branch</th>
                   <th className="px-4 py-3 text-left">Date</th>
@@ -312,6 +431,13 @@ function InvoicesPage() {
               <tbody>
                 {filtered.map((i: any) => (
                   <tr key={i.id} className="border-b border-border/40 transition hover:bg-muted/40">
+                    <td className="px-4 py-3">
+                      <Checkbox
+                        checked={selected.has(i.id)}
+                        onCheckedChange={(v) => toggleRow(i.id, !!v)}
+                        aria-label={`Select invoice ${i.invoice_no}`}
+                      />
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs">{i.invoice_no}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium">{i.clients?.legal_name}</div>
@@ -832,5 +958,272 @@ function NewInvoiceDialog({
         </Button>
       </div>
     </DialogContent>
+  );
+}
+
+const VALID_PAYMENT_STATUSES = ["Done", "Not Done", "Partial", "Unknown"];
+
+type ImportRowResult = {
+  line: number;
+  raw: Record<string, string>;
+  valid: boolean;
+  error?: string;
+  payload?: Record<string, any>;
+};
+
+function buildImportRow(
+  record: Record<string, string>,
+  line: number,
+  clients: any[],
+): ImportRowResult {
+  const clientName = (record["client"] ?? "").trim();
+  const branchName = (record["branch"] ?? "").trim();
+  const item = (record["item"] ?? "").trim();
+  const date = (record["date"] ?? "").trim();
+  const dueDateRaw = (record["due date"] ?? "").trim();
+  const weightRaw = (record["weight"] ?? "").trim();
+  const unitPriceRaw = (record["unit price"] ?? "").trim();
+  const amountRaw = (record["amount"] ?? "").trim();
+  const amountReceivedRaw = (record["amount received"] ?? "").trim();
+  const statusRaw = (record["payment status"] ?? "").trim();
+
+  if (!clientName) return { line, raw: record, valid: false, error: "Client is required" };
+  const client = clients.find(
+    (c: any) => (c.legal_name ?? "").trim().toLowerCase() === clientName.toLowerCase(),
+  );
+  if (!client)
+    return { line, raw: record, valid: false, error: `Client "${clientName}" not found` };
+
+  let branchId: string | null = null;
+  if (branchName) {
+    const branch = (client.branches ?? []).find(
+      (b: any) => (b.branch_name ?? "").trim().toLowerCase() === branchName.toLowerCase(),
+    );
+    if (!branch)
+      return {
+        line,
+        raw: record,
+        valid: false,
+        error: `Branch "${branchName}" not found for ${clientName}`,
+      };
+    branchId = branch.id;
+  }
+
+  if (!item) return { line, raw: record, valid: false, error: "Item is required" };
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { line, raw: record, valid: false, error: "Date must be in YYYY-MM-DD format" };
+  }
+  if (dueDateRaw && !/^\d{4}-\d{2}-\d{2}$/.test(dueDateRaw)) {
+    return { line, raw: record, valid: false, error: "Due Date must be in YYYY-MM-DD format" };
+  }
+
+  const weight = weightRaw === "" ? null : Number(weightRaw);
+  if (weightRaw !== "" && (!Number.isFinite(weight) || (weight as number) <= 0)) {
+    return { line, raw: record, valid: false, error: "Weight (kg) must be a positive number" };
+  }
+  const unitPrice = unitPriceRaw === "" ? null : Number(unitPriceRaw);
+  if (unitPriceRaw !== "" && !Number.isFinite(unitPrice)) {
+    return { line, raw: record, valid: false, error: "Unit Price must be a number" };
+  }
+  let amount = amountRaw === "" ? null : Number(amountRaw);
+  if (amountRaw !== "" && !Number.isFinite(amount)) {
+    return { line, raw: record, valid: false, error: "Amount must be a number" };
+  }
+  if (amount == null) {
+    if (weight != null && unitPrice != null) amount = weight * unitPrice;
+  }
+  if (!amount || amount <= 0) {
+    return {
+      line,
+      raw: record,
+      valid: false,
+      error: "Provide Amount, or both Weight (kg) and Unit Price",
+    };
+  }
+
+  const amountReceived = amountReceivedRaw === "" ? 0 : Number(amountReceivedRaw);
+  if (amountReceivedRaw !== "" && !Number.isFinite(amountReceived)) {
+    return { line, raw: record, valid: false, error: "Amount Received must be a number" };
+  }
+
+  const status = statusRaw || "Not Done";
+  if (!VALID_PAYMENT_STATUSES.includes(status)) {
+    return {
+      line,
+      raw: record,
+      valid: false,
+      error: `Payment Status must be one of: ${VALID_PAYMENT_STATUSES.join(", ")}`,
+    };
+  }
+
+  const dueDate = dueDateRaw || calculateInvoiceDueDate(date);
+
+  return {
+    line,
+    raw: record,
+    valid: true,
+    payload: {
+      client_id: client.id,
+      branch_id: branchId,
+      item,
+      date,
+      delivery_date: date,
+      due_date: dueDate,
+      weight_kg: weight,
+      unit_price: unitPrice,
+      amount,
+      amount_received: amountReceived,
+      payment_status: status,
+    },
+  };
+}
+
+function ImportInvoicesDialog({
+  open,
+  onOpenChange,
+  clients,
+  onImported,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clients: any[];
+  onImported: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [rows, setRows] = useState<ImportRowResult[]>([]);
+  const [importing, setImporting] = useState(false);
+
+  const validRows = rows.filter((r) => r.valid);
+  const invalidRows = rows.filter((r) => !r.valid);
+
+  function reset() {
+    setFileName(null);
+    setRows([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleFile(file: File) {
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      const records = parseCsvToRecords(text);
+      if (records.length === 0) {
+        toast.error("The file has no data rows");
+        setRows([]);
+        return;
+      }
+      setRows(records.map((record, idx) => buildImportRow(record, idx + 2, clients)));
+    };
+    reader.onerror = () => toast.error("Could not read the file");
+    reader.readAsText(file);
+  }
+
+  async function doImport() {
+    if (validRows.length === 0) return;
+    setImporting(true);
+    try {
+      const { error } = await supabase.from("invoices").insert(validRows.map((r) => r.payload));
+      if (error) throw error;
+      toast.success(`Imported ${validRows.length} invoice${validRows.length === 1 ? "" : "s"}`);
+      onImported();
+      reset();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e.message ?? "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function downloadTemplate() {
+    const csv = toCsv(EXPORT_HEADERS, [
+      [
+        "",
+        "Acme Foods",
+        "Main Branch",
+        "Fryguys Classic Fries",
+        "2026-01-15",
+        "",
+        "11",
+        "1250",
+        "",
+        "0",
+        "Not Done",
+      ],
+    ]);
+    downloadCsv("invoices-import-template.csv", csv);
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
+    >
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Import invoices from CSV</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Columns: Client, Branch (optional), Item, Date (YYYY-MM-DD), Due Date (optional, auto
+            +15 days), Weight (kg), Unit Price, Amount (auto if Weight + Unit Price given), Amount
+            Received, Payment Status. Invoice No. is auto-generated and ignored on import.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+              }}
+              className="max-w-xs"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>
+              <Download className="mr-1 h-3.5 w-3.5" /> Download template
+            </Button>
+          </div>
+
+          {rows.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-success">{validRows.length} ready to import</span>
+                {invalidRows.length > 0 && (
+                  <span className="text-destructive">{invalidRows.length} with errors</span>
+                )}
+              </div>
+              {invalidRows.length > 0 && (
+                <div className="max-h-48 overflow-y-auto rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs">
+                  {invalidRows.map((r) => (
+                    <div key={r.line} className="py-0.5">
+                      Row {r.line} ({r.raw["client"] || "?"}): {r.error}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <span className="text-xs text-muted-foreground">{fileName ?? "No file selected"}</span>
+            <Button
+              onClick={doImport}
+              disabled={validRows.length === 0 || importing}
+              className="bg-amber-500 text-black hover:bg-amber-600 disabled:opacity-50"
+            >
+              {importing
+                ? "Importing..."
+                : `Import ${validRows.length || ""} invoice${validRows.length === 1 ? "" : "s"}`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

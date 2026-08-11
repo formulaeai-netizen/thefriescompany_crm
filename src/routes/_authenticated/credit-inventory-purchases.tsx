@@ -29,6 +29,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -39,9 +46,11 @@ import {
 import {
   isCreditPurchaseOverdue,
   validateCreditPurchaseFormInput,
+  type CreditPurchasePaymentMode,
 } from "@/lib/credit-inventory-purchases";
 import { useIsAdmin, useIsStaffOnly } from "@/lib/roles";
 import { pkr } from "@/lib/format";
+import { fetchInventory } from "@/lib/queries";
 import {
   cancelCreditPurchase,
   createCreditPurchase,
@@ -64,6 +73,8 @@ type FormState = {
   due_at: string;
   reminder_lead_hours: string;
   notes: string;
+  payment_mode: CreditPurchasePaymentMode;
+  inventory_item_id: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -75,12 +86,18 @@ const EMPTY_FORM: FormState = {
   due_at: "",
   reminder_lead_hours: "24",
   notes: "",
+  payment_mode: "credit",
+  inventory_item_id: "",
 };
 
 function statusTone(status: string) {
   if (status === "paid") return "border-success/30 text-success";
   if (status === "cancelled") return "border-muted-foreground/30 text-muted-foreground";
   return "border-warning/30 text-warning";
+}
+
+function paymentModeTone(mode: string) {
+  return mode === "cash" ? "border-primary/30 text-primary" : "border-white/20 text-white/70";
 }
 
 function reminderStateLabel(row: any) {
@@ -102,6 +119,7 @@ function CreditInventoryPurchasesPage() {
   const cancelFn = useServerFn(cancelCreditPurchase);
 
   const listQ = useQuery({ queryKey: ["credit-inventory-purchases"], queryFn: () => listFn({}) });
+  const inventoryQ = useQuery({ queryKey: ["inventory"], queryFn: fetchInventory });
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -118,14 +136,20 @@ function CreditInventoryPurchasesPage() {
           item_name_snapshot: form.item_name_snapshot.trim(),
           amount_due: Number(form.amount_due),
           due_at: new Date(form.due_at).toISOString(),
+          inventory_item_id: form.inventory_item_id || null,
           quantity: form.quantity.trim() ? Number(form.quantity) : null,
           unit: form.unit.trim() || null,
           notes: form.notes.trim() || null,
           reminder_lead_hours: Number(form.reminder_lead_hours) || 24,
+          payment_mode: form.payment_mode,
         },
       }),
     onSuccess: () => {
-      toast.success("Credit purchase created");
+      toast.success(
+        form.payment_mode === "cash"
+          ? "Cash purchase recorded and paid"
+          : "Credit purchase created",
+      );
       setDialogOpen(false);
       invalidate();
     },
@@ -141,6 +165,7 @@ function CreditInventoryPurchasesPage() {
           item_name_snapshot: form.item_name_snapshot.trim(),
           amount_due: Number(form.amount_due),
           due_at: new Date(form.due_at).toISOString(),
+          inventory_item_id: form.inventory_item_id || null,
           quantity: form.quantity.trim() ? Number(form.quantity) : null,
           unit: form.unit.trim() || null,
           notes: form.notes.trim() || null,
@@ -191,6 +216,8 @@ function CreditInventoryPurchasesPage() {
       due_at: row.due_at ? row.due_at.slice(0, 16) : "",
       reminder_lead_hours: String(row.reminder_lead_hours ?? 24),
       notes: row.notes ?? "",
+      payment_mode: (row.payment_mode as CreditPurchasePaymentMode) ?? "credit",
+      inventory_item_id: row.inventory_item_id ?? "",
     });
     setDialogOpen(true);
   }
@@ -215,7 +242,8 @@ function CreditInventoryPurchasesPage() {
             Credit Inventory Purchases
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Material/inventory purchased on credit, with configurable WhatsApp due-reminders.
+            Material/inventory purchases - cash (paid immediately) or credit (payable later, with
+            configurable WhatsApp due-reminders).
           </p>
         </div>
         {canCreateOrEdit && <Button onClick={openCreate}>New Credit Purchase</Button>}
@@ -232,6 +260,7 @@ function CreditInventoryPurchasesPage() {
                 <TableHead>Product</TableHead>
                 <TableHead>Supplier</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Payment Mode</TableHead>
                 <TableHead>Due</TableHead>
                 <TableHead>Reminder Lead</TableHead>
                 <TableHead>Status</TableHead>
@@ -243,7 +272,10 @@ function CreditInventoryPurchasesPage() {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={10}
+                    className="py-8 text-center text-sm text-muted-foreground"
+                  >
                     No credit purchases yet.
                   </TableCell>
                 </TableRow>
@@ -266,6 +298,11 @@ function CreditInventoryPurchasesPage() {
                       </TableCell>
                       <TableCell className="text-xs">{row.supplier_name}</TableCell>
                       <TableCell className="text-xs tabular">{pkr(row.amount_due)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={paymentModeTone(row.payment_mode)}>
+                          {row.payment_mode === "cash" ? "Cash" : "Credit"}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-xs">
                         {new Date(row.due_at).toLocaleString()}
                         {overdue && (
@@ -311,8 +348,8 @@ function CreditInventoryPurchasesPage() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Mark this purchase paid?</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    {row.item_name_snapshot} from {row.supplier_name} (
-                                    {pkr(row.amount_due)}).
+                                    {row.item_name_snapshot} from {row.supplier_name}. This will
+                                    deduct <strong>{pkr(row.amount_due)}</strong> from Cash in Hand.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -376,6 +413,33 @@ function CreditInventoryPurchasesPage() {
             <DialogTitle>{editingId ? "Edit" : "New"} Credit Purchase</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 space-y-1">
+              <Label className="text-xs">Payment Mode</Label>
+              <Select
+                value={form.payment_mode}
+                onValueChange={(v) =>
+                  setForm({ ...form, payment_mode: v as CreditPurchasePaymentMode })
+                }
+                disabled={!!editingId}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="credit">
+                    Credit (payable later, due-reminders apply)
+                  </SelectItem>
+                  <SelectItem value="cash">
+                    Cash (paid now, debits Cash in Hand immediately)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {editingId && (
+                <p className="text-[11px] text-muted-foreground">
+                  Payment mode cannot be changed after creation.
+                </p>
+              )}
+            </div>
             <FormField label="Supplier Name" error={formErrors.supplier_name}>
               <Input
                 value={form.supplier_name}
@@ -388,6 +452,27 @@ function CreditInventoryPurchasesPage() {
                 onChange={(e) => setForm({ ...form, item_name_snapshot: e.target.value })}
               />
             </FormField>
+            <div className="col-span-2 space-y-1">
+              <Label className="text-xs">Inventory Item (optional - updates stock on save)</Label>
+              <Select
+                value={form.inventory_item_id || "none"}
+                onValueChange={(v) =>
+                  setForm({ ...form, inventory_item_id: v === "none" ? "" : v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Not linked to an inventory item" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not linked</SelectItem>
+                  {(inventoryQ.data ?? []).map((item: any) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.item_name} ({Number(item.current_stock)} {item.unit ?? ""})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <FormField label="Quantity (optional)">
               <Input
                 type="number"

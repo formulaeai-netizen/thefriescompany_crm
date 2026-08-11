@@ -302,73 +302,167 @@ export type Database = {
         Row: {
           absent_days: number;
           advance_balance: number;
+          advance_deduction: number;
           advance_repaid: number | null;
           advance_taken: number;
+          allowances: number;
+          base_earned: number;
+          base_salary_used: number;
           basic_salary: number;
+          bonus: number;
+          cancel_reason: string | null;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          commission: number;
           created_at: string;
+          created_by: string | null;
           department: string | null;
           designation: string | null;
           employee_id: string;
           employee_name: string;
+          employee_ref_id: string | null;
+          finalized_at: string | null;
+          finalized_by: string | null;
           gross_salary: number;
           id: string;
           income_tax: number;
+          manual_adjustment: number;
+          manual_adjustment_reason: string | null;
           month: string;
+          net_salary: number;
           non_paid_holidays: number;
+          notes: string | null;
+          other_deduction: number;
+          other_earnings: number;
+          overtime_amount: number;
+          overtime_hours: number;
+          overtime_rate: number;
           paid: boolean;
           paid_at: string | null;
           paid_by: string | null;
+          paid_leave_days: number;
+          period_month: number;
+          period_year: number;
+          present_days: number | null;
           repayment_collected_by: string | null;
+          status: string;
+          total_deductions: number;
           total_working_days: number;
+          unpaid_leave_days: number;
+          unpaid_leave_deduction: number;
           updated_at: string;
         };
         Insert: {
           absent_days?: number;
           advance_balance?: number;
+          advance_deduction?: number;
           advance_repaid?: number | null;
           advance_taken?: number;
+          allowances?: number;
+          base_earned?: number;
+          base_salary_used?: number;
           basic_salary?: number;
+          bonus?: number;
+          cancel_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          commission?: number;
           created_at?: string;
+          created_by?: string | null;
           department?: string | null;
           designation?: string | null;
           employee_id: string;
           employee_name: string;
+          employee_ref_id?: string | null;
+          finalized_at?: string | null;
+          finalized_by?: string | null;
           gross_salary?: number;
           id?: string;
           income_tax?: number;
+          manual_adjustment?: number;
+          manual_adjustment_reason?: string | null;
           month: string;
+          net_salary?: number;
           non_paid_holidays?: number;
+          notes?: string | null;
+          other_deduction?: number;
+          other_earnings?: number;
+          overtime_amount?: number;
+          overtime_hours?: number;
+          overtime_rate?: number;
           paid?: boolean;
           paid_at?: string | null;
           paid_by?: string | null;
+          paid_leave_days?: number;
+          present_days?: number | null;
           repayment_collected_by?: string | null;
+          status?: string;
+          total_deductions?: number;
           total_working_days?: number;
+          unpaid_leave_days?: number;
+          unpaid_leave_deduction?: number;
           updated_at?: string;
         };
         Update: {
           absent_days?: number;
           advance_balance?: number;
+          advance_deduction?: number;
           advance_repaid?: number | null;
           advance_taken?: number;
+          allowances?: number;
+          base_earned?: number;
+          base_salary_used?: number;
           basic_salary?: number;
+          bonus?: number;
+          cancel_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          commission?: number;
           created_at?: string;
+          created_by?: string | null;
           department?: string | null;
           designation?: string | null;
           employee_id?: string;
           employee_name?: string;
+          employee_ref_id?: string | null;
+          finalized_at?: string | null;
+          finalized_by?: string | null;
           gross_salary?: number;
           id?: string;
           income_tax?: number;
+          manual_adjustment?: number;
+          manual_adjustment_reason?: string | null;
           month?: string;
+          net_salary?: number;
           non_paid_holidays?: number;
+          notes?: string | null;
+          other_deduction?: number;
+          other_earnings?: number;
+          overtime_amount?: number;
+          overtime_hours?: number;
+          overtime_rate?: number;
           paid?: boolean;
           paid_at?: string | null;
           paid_by?: string | null;
+          paid_leave_days?: number;
+          present_days?: number | null;
           repayment_collected_by?: string | null;
+          status?: string;
+          total_deductions?: number;
           total_working_days?: number;
+          unpaid_leave_days?: number;
+          unpaid_leave_deduction?: number;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "employee_salaries_employee_ref_id_fkey";
+            columns: ["employee_ref_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       expenses: {
         Row: {
@@ -1845,11 +1939,17 @@ export type Database = {
           client_id: string | null;
           created_at: string;
           created_by: string | null;
+          credit_purchase_id: string | null;
+          direction: string;
           entry_type: string;
+          expense_id: string | null;
           id: string;
           invoice_id: string | null;
           notes: string | null;
           payment_verification_request_id: string | null;
+          reverses_entry_id: string | null;
+          salary_advance_id: string | null;
+          salary_id: string | null;
           source_key: string;
         };
         Insert: {
@@ -1857,11 +1957,17 @@ export type Database = {
           client_id?: string | null;
           created_at?: string;
           created_by?: string | null;
+          credit_purchase_id?: string | null;
+          direction: string;
           entry_type: string;
+          expense_id?: string | null;
           id?: string;
           invoice_id?: string | null;
           notes?: string | null;
           payment_verification_request_id?: string | null;
+          reverses_entry_id?: string | null;
+          salary_advance_id?: string | null;
+          salary_id?: string | null;
           source_key: string;
         };
         Update: {
@@ -1869,11 +1975,17 @@ export type Database = {
           client_id?: string | null;
           created_at?: string;
           created_by?: string | null;
+          credit_purchase_id?: string | null;
+          direction?: string;
           entry_type?: string;
+          expense_id?: string | null;
           id?: string;
           invoice_id?: string | null;
           notes?: string | null;
           payment_verification_request_id?: string | null;
+          reverses_entry_id?: string | null;
+          salary_advance_id?: string | null;
+          salary_id?: string | null;
           source_key?: string;
         };
         Relationships: [
@@ -1896,6 +2008,41 @@ export type Database = {
             columns: ["payment_verification_request_id"];
             isOneToOne: false;
             referencedRelation: "payment_verification_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cash_ledger_entries_expense_id_fkey";
+            columns: ["expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cash_ledger_entries_credit_purchase_id_fkey";
+            columns: ["credit_purchase_id"];
+            isOneToOne: false;
+            referencedRelation: "credit_inventory_purchases";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cash_ledger_entries_salary_id_fkey";
+            columns: ["salary_id"];
+            isOneToOne: false;
+            referencedRelation: "employee_salaries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cash_ledger_entries_salary_advance_id_fkey";
+            columns: ["salary_advance_id"];
+            isOneToOne: false;
+            referencedRelation: "salary_advances";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cash_ledger_entries_reverses_entry_id_fkey";
+            columns: ["reverses_entry_id"];
+            isOneToOne: false;
+            referencedRelation: "cash_ledger_entries";
             referencedColumns: ["id"];
           },
         ];
@@ -1937,6 +2084,7 @@ export type Database = {
           item_name_snapshot: string;
           notes: string | null;
           paid_at: string | null;
+          payment_mode: string;
           purchased_at: string;
           quantity: number | null;
           reminder_lead_hours: number;
@@ -1959,6 +2107,7 @@ export type Database = {
           item_name_snapshot: string;
           notes?: string | null;
           paid_at?: string | null;
+          payment_mode?: string;
           purchased_at?: string;
           quantity?: number | null;
           reminder_lead_hours?: number;
@@ -1981,6 +2130,7 @@ export type Database = {
           item_name_snapshot?: string;
           notes?: string | null;
           paid_at?: string | null;
+          payment_mode?: string;
           purchased_at?: string;
           quantity?: number | null;
           reminder_lead_hours?: number;
@@ -1997,6 +2147,140 @@ export type Database = {
             columns: ["inventory_item_id"];
             isOneToOne: false;
             referencedRelation: "inventory";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      employees: {
+        Row: {
+          base_salary: number;
+          created_at: string;
+          created_by: string | null;
+          department: string | null;
+          designation: string | null;
+          employee_code: string;
+          fixed_allowance: number;
+          full_name: string;
+          id: string;
+          is_active: boolean;
+          notes: string | null;
+          overtime_rate: number;
+          standard_daily_hours: number | null;
+          standard_working_days: number;
+          updated_at: string;
+        };
+        Insert: {
+          base_salary?: number;
+          created_at?: string;
+          created_by?: string | null;
+          department?: string | null;
+          designation?: string | null;
+          employee_code: string;
+          fixed_allowance?: number;
+          full_name: string;
+          id?: string;
+          is_active?: boolean;
+          notes?: string | null;
+          overtime_rate?: number;
+          standard_daily_hours?: number | null;
+          standard_working_days?: number;
+          updated_at?: string;
+        };
+        Update: {
+          base_salary?: number;
+          created_at?: string;
+          created_by?: string | null;
+          department?: string | null;
+          designation?: string | null;
+          employee_code?: string;
+          fixed_allowance?: number;
+          full_name?: string;
+          id?: string;
+          is_active?: boolean;
+          notes?: string | null;
+          overtime_rate?: number;
+          standard_daily_hours?: number | null;
+          standard_working_days?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      salary_advances: {
+        Row: {
+          advance_date: string;
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          employee_ref_id: string;
+          id: string;
+          notes: string | null;
+        };
+        Insert: {
+          advance_date?: string;
+          amount: number;
+          created_at?: string;
+          created_by?: string | null;
+          employee_ref_id: string;
+          id?: string;
+          notes?: string | null;
+        };
+        Update: {
+          advance_date?: string;
+          amount?: number;
+          created_at?: string;
+          created_by?: string | null;
+          employee_ref_id?: string;
+          id?: string;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "salary_advances_employee_ref_id_fkey";
+            columns: ["employee_ref_id"];
+            isOneToOne: false;
+            referencedRelation: "employees";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      payroll_advance_links: {
+        Row: {
+          advance_id: string;
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          payroll_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          advance_id: string;
+          amount: number;
+          created_at?: string;
+          created_by?: string | null;
+          payroll_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          advance_id?: string;
+          amount?: number;
+          created_at?: string;
+          created_by?: string | null;
+          payroll_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payroll_advance_links_advance_id_fkey";
+            columns: ["advance_id"];
+            isOneToOne: false;
+            referencedRelation: "salary_advances";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payroll_advance_links_payroll_id_fkey";
+            columns: ["payroll_id"];
+            isOneToOne: false;
+            referencedRelation: "employee_salaries";
             referencedColumns: ["id"];
           },
         ];
@@ -2054,12 +2338,107 @@ export type Database = {
       get_cash_in_hand_summary: {
         Args: Record<PropertyKey, never>;
         Returns: {
+          adjustments_total: number;
           cash_in_hand: number;
           client_payment_credits: number;
           expenses_total: number;
+          inventory_purchases_paid_total: number;
           opening_balance: number;
           paid_salaries_total: number;
+          salary_advances_paid_total: number;
         }[];
+      };
+      calculate_payroll: {
+        Args: {
+          _absent_days: number;
+          _advance_deduction: number;
+          _allowances: number;
+          _base_salary: number;
+          _bonus: number;
+          _commission: number;
+          _manual_adjustment: number;
+          _other_deduction: number;
+          _other_earnings: number;
+          _overtime_hours: number;
+          _overtime_rate: number;
+          _payroll_working_days: number;
+          _unpaid_leave_days: number;
+        };
+        Returns: {
+          base_earned: number;
+          daily_rate: number;
+          gross_salary: number;
+          net_salary: number;
+          overtime_amount: number;
+          total_deductions: number;
+          unpaid_leave_deduction: number;
+        }[];
+      };
+      save_payroll_draft: {
+        Args: {
+          _absent_days: number;
+          _allowances: number;
+          _base_salary_used: number | null;
+          _bonus: number;
+          _commission: number;
+          _employee_ref_id: string;
+          _manual_adjustment: number;
+          _manual_adjustment_reason: string | null;
+          _month: string;
+          _notes: string | null;
+          _other_deduction: number;
+          _other_earnings: number;
+          _overtime_hours: number;
+          _overtime_rate: number;
+          _paid_leave_days: number;
+          _payroll_id: string | null;
+          _present_days: number | null;
+          _total_working_days: number;
+          _unpaid_leave_days: number;
+        };
+        Returns: string;
+      };
+      finalize_payroll: {
+        Args: {
+          _payroll_id: string;
+        };
+        Returns: undefined;
+      };
+      revert_payroll_to_draft: {
+        Args: {
+          _payroll_id: string;
+        };
+        Returns: undefined;
+      };
+      cancel_payroll: {
+        Args: {
+          _payroll_id: string;
+          _reason: string;
+        };
+        Returns: undefined;
+      };
+      mark_payroll_paid: {
+        Args: {
+          _payroll_id: string;
+        };
+        Returns: undefined;
+      };
+      create_salary_advance: {
+        Args: {
+          _advance_date?: string;
+          _amount: number;
+          _employee_ref_id: string;
+          _notes?: string | null;
+        };
+        Returns: string;
+      };
+      link_salary_advance_to_payroll: {
+        Args: {
+          _advance_id: string;
+          _amount: number;
+          _payroll_id: string;
+        };
+        Returns: undefined;
       };
       normalize_pk_whatsapp_phone: {
         Args: {
@@ -2087,6 +2466,7 @@ export type Database = {
           _inventory_item_id?: string | null;
           _item_name_snapshot: string;
           _notes?: string | null;
+          _payment_mode?: string;
           _quantity?: number | null;
           _reminder_lead_hours?: number;
           _supplier_name: string;

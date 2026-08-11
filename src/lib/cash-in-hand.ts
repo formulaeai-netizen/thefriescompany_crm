@@ -39,19 +39,32 @@ export type CashInHandInputs = {
   openingBalance: number;
   clientPaymentCredits: number;
   expensesTotal: number;
+  inventoryPurchasesPaidTotal: number;
   paidSalariesTotal: number;
+  salaryAdvancesPaidTotal: number;
+  adjustmentsTotal: number;
 };
 
 /**
- * Final Cash in Hand formula (owner-provided):
- *   opening_balance + approved client-payment credits - expenses - paid salaries
+ * Final Cash in Hand formula (Phase 1, ledger-truth; Phase 3 adds salary
+ * advances as their own distinguishable, always-cash-affecting term):
+ *   opening_balance + approved client-payment credits - expenses
+ *   - paid inventory purchases - paid salaries - salary advances paid
+ *   + explicit admin adjustments
+ *
+ * This mirrors public.get_cash_in_hand_summary() exactly - every term now
+ * comes from cash_ledger_entries (a single canonical source), not from
+ * separately re-computed source-table sums.
  */
 export function calculateCashInHand(inputs: CashInHandInputs): number {
   return (
     (Number(inputs.openingBalance) || 0) +
     (Number(inputs.clientPaymentCredits) || 0) -
     (Number(inputs.expensesTotal) || 0) -
-    (Number(inputs.paidSalariesTotal) || 0)
+    (Number(inputs.inventoryPurchasesPaidTotal) || 0) -
+    (Number(inputs.paidSalariesTotal) || 0) -
+    (Number(inputs.salaryAdvancesPaidTotal) || 0) +
+    (Number(inputs.adjustmentsTotal) || 0)
   );
 }
 
@@ -59,7 +72,10 @@ export type CashInHandSummary = {
   opening_balance: number;
   client_payment_credits: number;
   expenses_total: number;
+  inventory_purchases_paid_total: number;
   paid_salaries_total: number;
+  salary_advances_paid_total: number;
+  adjustments_total: number;
   cash_in_hand: number;
 };
 
@@ -68,7 +84,10 @@ export type CashInHandDisplayRow = {
     | "opening_balance"
     | "client_payment_credits"
     | "expenses_total"
+    | "inventory_purchases_paid_total"
     | "paid_salaries_total"
+    | "salary_advances_paid_total"
+    | "adjustments_total"
     | "cash_in_hand";
   label: string;
   value: number;
@@ -89,7 +108,18 @@ export function buildCashInHandDisplayRows(summary: CashInHandSummary): CashInHa
       value: summary.client_payment_credits,
     },
     { key: "expenses_total", label: "Expenses", value: -summary.expenses_total },
-    { key: "paid_salaries_total", label: "Paid Salaries", value: -summary.paid_salaries_total },
+    {
+      key: "inventory_purchases_paid_total",
+      label: "Inventory Purchases Paid",
+      value: -summary.inventory_purchases_paid_total,
+    },
+    { key: "paid_salaries_total", label: "Salaries Paid", value: -summary.paid_salaries_total },
+    {
+      key: "salary_advances_paid_total",
+      label: "Salary Advances Paid",
+      value: -summary.salary_advances_paid_total,
+    },
+    { key: "adjustments_total", label: "Adjustments", value: summary.adjustments_total },
     {
       key: "cash_in_hand",
       label: "Current Cash in Hand",

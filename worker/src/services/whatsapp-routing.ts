@@ -5,6 +5,7 @@ export const WHATSAPP_ROUTING_FLOW_KEYS = [
   "wastage_alerts",
   "stock_audit_alerts",
   "credit_purchase_reminders",
+  "expense_intake_sender",
 ] as const;
 
 export type WhatsAppRoutingFlowKey = (typeof WHATSAPP_ROUTING_FLOW_KEYS)[number];

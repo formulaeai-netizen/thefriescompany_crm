@@ -6,6 +6,7 @@ export const WHATSAPP_ROUTING_FLOW_KEYS = [
   "wastage_alerts",
   "stock_audit_alerts",
   "credit_purchase_reminders",
+  "expense_intake_sender",
 ] as const;
 
 export type WhatsAppRoutingFlowKey = (typeof WHATSAPP_ROUTING_FLOW_KEYS)[number];
@@ -35,4 +36,5 @@ export const WHATSAPP_ROUTING_FLOW_LABELS: Record<WhatsAppRoutingFlowKey, string
   wastage_alerts: "Wastage / Operational Alerts",
   stock_audit_alerts: "Inventory Audit Alerts",
   credit_purchase_reminders: "Credit Purchase Due Reminders",
+  expense_intake_sender: "Trusted Expense Intake Sender",
 };

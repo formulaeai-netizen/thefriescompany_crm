@@ -178,3 +178,28 @@ export function buildCreditPurchaseReminderMessage(
     `Reference: ${input.reference}`,
   ].join("\n");
 }
+
+// Phase 2: trusted WhatsApp expense intake reply templates. Deterministic
+// only - never echoes raw DB errors, never guesses a value the parser
+// didn't already validate.
+
+const EXPENSE_FORMAT_GUIDANCE = [
+  "EXPENSE 2500 Fuel",
+  "",
+  "List format:",
+  "EXPENSE LIST",
+  "Fuel | 2500",
+  "Packaging | 1800",
+];
+
+export function buildExpenseRecordedReply(input: { description: string; amount: number }): string {
+  return `Expense recorded: ${input.description} — Rs ${formatMoney(input.amount)}.`;
+}
+
+export function buildExpenseListRecordedReply(input: { count: number; total: number }): string {
+  return [`${input.count} expenses recorded.`, `Total: Rs ${formatMoney(input.total)}.`].join("\n");
+}
+
+export function buildExpenseNotRecordedReply(): string {
+  return ["Expense not recorded. Please use:", "", ...EXPENSE_FORMAT_GUIDANCE].join("\n");
+}

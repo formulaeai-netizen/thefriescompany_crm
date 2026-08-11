@@ -30,7 +30,7 @@ export const listCreditPurchases = createServerFn({ method: "GET" })
     const { data, error } = await (context.supabase as any)
       .from("credit_inventory_purchases")
       .select(
-        "id, supplier_name, inventory_item_id, item_name_snapshot, quantity, unit, amount_due, purchased_at, due_at, status, notes, created_by, created_at, updated_at, paid_at, cancelled_at, cancellation_reason, reminder_lead_hours, reminder_queued_at, reminder_sent_at",
+        "id, supplier_name, inventory_item_id, item_name_snapshot, quantity, unit, amount_due, purchased_at, due_at, status, payment_mode, notes, created_by, created_at, updated_at, paid_at, cancelled_at, cancellation_reason, reminder_lead_hours, reminder_queued_at, reminder_sent_at",
       )
       .order("due_at", { ascending: true });
     if (error) throw new Error(`Credit purchase list failed: ${error.message}`);
@@ -60,6 +60,7 @@ const createSchema = z.object({
   unit: z.string().trim().max(20).nullable().optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
   reminder_lead_hours: z.number().int().positive().max(720).optional(),
+  payment_mode: z.enum(["cash", "credit"]).optional(),
 });
 
 export const createCreditPurchase = createServerFn({ method: "POST" })
@@ -79,13 +80,16 @@ export const createCreditPurchase = createServerFn({ method: "POST" })
         _unit: data.unit ?? null,
         _notes: data.notes ?? null,
         _reminder_lead_hours: data.reminder_lead_hours ?? 24,
+        _payment_mode: data.payment_mode ?? "credit",
       },
     );
     if (error) throw new Error(`Credit purchase creation failed: ${error.message}`);
     return { ok: true, id: newId };
   });
 
-const updateSchema = createSchema.extend({
+// payment_mode is immutable after creation - editing a purchase never
+// changes cash vs credit, only its record details while still unpaid.
+const updateSchema = createSchema.omit({ payment_mode: true }).extend({
   purchase_id: z.string().uuid(),
 });
 

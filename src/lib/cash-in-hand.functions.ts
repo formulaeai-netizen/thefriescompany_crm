@@ -30,7 +30,10 @@ export const getCashInHandSummary = createServerFn({ method: "GET" })
       opening_balance: Number(row?.opening_balance ?? 0),
       client_payment_credits: Number(row?.client_payment_credits ?? 0),
       expenses_total: Number(row?.expenses_total ?? 0),
+      inventory_purchases_paid_total: Number(row?.inventory_purchases_paid_total ?? 0),
       paid_salaries_total: Number(row?.paid_salaries_total ?? 0),
+      salary_advances_paid_total: Number(row?.salary_advances_paid_total ?? 0),
+      adjustments_total: Number(row?.adjustments_total ?? 0),
       cash_in_hand: Number(row?.cash_in_hand ?? 0),
     };
   });

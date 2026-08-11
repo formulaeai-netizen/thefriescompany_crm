@@ -11,6 +11,11 @@ import {
 import { createWorkerSupabaseClient } from "./services/supabase.js";
 
 const LIVE_CONFIRMATION = "SEND_LIVE_OPERATIONAL_ALERTS";
+const LIVE_CONNECT_TIMEOUT_MS = 60_000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function createProvider(config: ReturnType<typeof loadWorkerConfig>): WhatsAppProvider {
   if (config.provider === "meta-cloud") return new MetaCloudProvider(config.allowRealSend);
@@ -29,6 +34,27 @@ function readConfirmation(): string | null {
   return process.argv.find((arg) => arg.startsWith("--confirm="))?.split("=", 2)[1] ?? null;
 }
 
+function readMaxPerRun(): number | undefined {
+  const raw = process.argv.find((arg) => arg.startsWith("--max="))?.split("=", 2)[1];
+  if (!raw) return undefined;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) throw new Error("--max must be a positive integer");
+  return value;
+}
+
+async function waitForProviderConnected(provider: WhatsAppProvider): Promise<void> {
+  const deadline = Date.now() + LIVE_CONNECT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const status = provider.getStatus();
+    if (status.connected) return;
+    if (status.lastError)
+      throw new Error(`WhatsApp provider failed to connect: ${status.lastError}`);
+    await delay(500);
+  }
+
+  throw new Error("WhatsApp provider did not become connected before the live send timeout");
+}
+
 async function main() {
   const mode = readMode();
   if (mode === "live" && readConfirmation() !== LIVE_CONFIRMATION) {
@@ -42,14 +68,19 @@ async function main() {
 
   const supabase = createWorkerSupabaseClient(config);
   const provider = createProvider(config);
+  const maxPerRun = readMaxPerRun();
 
   try {
-    if (mode === "live") await provider.initialize();
+    if (mode === "live") {
+      await provider.initialize();
+      await waitForProviderConnected(provider);
+    }
     const report = await runAlertDispatchWorkflow({
       repository: new SupabaseAlertDispatchRepository(supabase),
       provider,
       config,
       mode,
+      maxPerRun,
     });
     logAlertDispatchReport(report);
   } finally {

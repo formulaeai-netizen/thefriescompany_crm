@@ -9,6 +9,10 @@ import {
   startInboundPaymentListener,
   SupabaseInboundPaymentRepository,
 } from "./services/inbound-payment-confirmations.js";
+import {
+  startInboundExpenseListener,
+  SupabaseExpenseIntakeRepository,
+} from "./services/inbound-expense-intake.js";
 
 function createProvider(config: ReturnType<typeof loadWorkerConfig>): WhatsAppProvider {
   if (config.provider === "meta-cloud") return new MetaCloudProvider(config.allowRealSend);
@@ -26,11 +30,13 @@ async function main() {
   const provider = createProvider(config);
   let scheduler: SchedulerHandle | null = null;
   let stopInboundListener: (() => void) | null = null;
+  let stopExpenseIntakeListener: (() => void) | null = null;
 
   const shutdown = async (signal: string) => {
     console.info(`${signal} received. Stopping scheduler and disconnecting provider...`);
     scheduler?.stop();
     stopInboundListener?.();
+    stopExpenseIntakeListener?.();
     await provider.disconnect();
     process.exit(0);
   };
@@ -47,6 +53,13 @@ async function main() {
       provider,
     );
     console.info("Inbound payment confirmation listener started");
+
+    stopExpenseIntakeListener = startInboundExpenseListener(
+      whatsappClient,
+      new SupabaseExpenseIntakeRepository(supabase),
+      provider,
+    );
+    console.info("Inbound trusted expense intake listener started");
   }
   logWorkerStatus(
     buildWorkerStatus(provider.getStatus(), {

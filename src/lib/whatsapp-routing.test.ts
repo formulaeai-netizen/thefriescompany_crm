@@ -30,9 +30,10 @@ test("stock-audit alerts route to a separate recipient flow from wastage/operati
   );
 });
 
-test("all three configurable flow keys are recognized; invoice reminders is not one of them", () => {
+test("all four configurable flow keys are recognized; invoice reminders is not one of them", () => {
   assert.deepEqual([...WHATSAPP_ROUTING_FLOW_KEYS].sort(), [
     "credit_purchase_reminders",
+    "expense_intake_sender",
     "stock_audit_alerts",
     "wastage_alerts",
   ]);

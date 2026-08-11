@@ -1,3 +1,5 @@
+export type CreditPurchasePaymentMode = "cash" | "credit";
+
 export type CreditInventoryPurchaseInput = {
   status: "unpaid" | "paid" | "cancelled";
   due_at: string;
