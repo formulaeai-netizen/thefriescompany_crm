@@ -1,31 +1,34 @@
 -- Customer access is additive and separate from internal CRM identities.
 ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'customer';
 
-CREATE TABLE public.customer_portal_identities (
+CREATE TABLE IF NOT EXISTS public.customer_portal_identities (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   created_by uuid REFERENCES auth.users(id)
 );
-CREATE TABLE public.customer_portal_branch_access (
+CREATE TABLE IF NOT EXISTS public.customer_portal_branch_access (
   user_id uuid NOT NULL REFERENCES public.customer_portal_identities(user_id) ON DELETE CASCADE,
   branch_id uuid NOT NULL REFERENCES public.branches(id) ON DELETE CASCADE,
   PRIMARY KEY(user_id, branch_id)
 );
-CREATE TABLE public.customer_product_aliases (
+CREATE TABLE IF NOT EXISTS public.customer_product_aliases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id uuid REFERENCES public.clients(id) ON DELETE CASCADE,
   branch_id uuid REFERENCES public.branches(id) ON DELETE CASCADE,
   alias text NOT NULL,
   product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE
 );
-CREATE UNIQUE INDEX customer_product_aliases_unique ON public.customer_product_aliases(client_id, branch_id, lower(alias)) NULLS NOT DISTINCT;
+CREATE UNIQUE INDEX IF NOT EXISTS customer_product_aliases_unique ON public.customer_product_aliases(client_id, branch_id, lower(alias)) NULLS NOT DISTINCT;
 ALTER TABLE public.customer_portal_identities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customer_portal_branch_access ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customer_product_aliases ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Customer identity self read" ON public.customer_portal_identities;
 CREATE POLICY "Customer identity self read" ON public.customer_portal_identities FOR SELECT TO authenticated USING (user_id=auth.uid() OR public.has_role(auth.uid(),'admin'));
+DROP POLICY IF EXISTS "Customer branch self read" ON public.customer_portal_branch_access;
 CREATE POLICY "Customer branch self read" ON public.customer_portal_branch_access FOR SELECT TO authenticated USING (user_id=auth.uid() OR public.has_role(auth.uid(),'admin'));
+DROP POLICY IF EXISTS "Customer aliases self read" ON public.customer_product_aliases;
 CREATE POLICY "Customer aliases self read" ON public.customer_product_aliases FOR SELECT TO authenticated USING (client_id=(SELECT client_id FROM public.customer_portal_identities WHERE user_id=auth.uid()) OR public.has_role(auth.uid(),'admin'));
 
 CREATE OR REPLACE FUNCTION public.assert_customer_portal_identity(_branch_id uuid DEFAULT NULL)

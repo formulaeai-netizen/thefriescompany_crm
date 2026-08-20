@@ -1,4 +1,4 @@
-CREATE TABLE public.customer_whatsapp_senders (
+CREATE TABLE IF NOT EXISTS public.customer_whatsapp_senders (
   sender_normalized text PRIMARY KEY CHECK (sender_normalized ~ '^923[0-9]{9}$'),
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
   branch_id uuid REFERENCES public.branches(id) ON DELETE CASCADE,
@@ -7,6 +7,7 @@ CREATE TABLE public.customer_whatsapp_senders (
   created_by uuid REFERENCES auth.users(id)
 );
 ALTER TABLE public.customer_whatsapp_senders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage customer WhatsApp senders" ON public.customer_whatsapp_senders;
 CREATE POLICY "Admins manage customer WhatsApp senders" ON public.customer_whatsapp_senders FOR ALL TO authenticated USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
 GRANT ALL ON public.customer_whatsapp_senders TO service_role;
 

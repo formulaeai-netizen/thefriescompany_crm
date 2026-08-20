@@ -1,5 +1,5 @@
 -- Advisory allocation only: this migration never creates invoices, ledger rows, or receivables.
-CREATE TABLE public.allocation_minimum_delivery_policies (
+CREATE TABLE IF NOT EXISTS public.allocation_minimum_delivery_policies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id uuid REFERENCES public.products(id) ON DELETE CASCADE,
   client_id uuid REFERENCES public.clients(id) ON DELETE CASCADE,
@@ -12,7 +12,7 @@ CREATE TABLE public.allocation_minimum_delivery_policies (
   CHECK (product_id IS NOT NULL OR client_id IS NOT NULL OR branch_id IS NOT NULL)
 );
 
-CREATE TABLE public.stock_allocation_plans (
+CREATE TABLE IF NOT EXISTS public.stock_allocation_plans (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   plan_date date NOT NULL DEFAULT current_date,
   strategy text NOT NULL DEFAULT 'fair_share' CHECK (strategy IN ('fair_share','oldest_first','priority_weighted')),
@@ -27,7 +27,7 @@ CREATE TABLE public.stock_allocation_plans (
   cancelled_by uuid REFERENCES auth.users(id)
 );
 
-CREATE TABLE public.stock_allocation_plan_items (
+CREATE TABLE IF NOT EXISTS public.stock_allocation_plan_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   allocation_plan_id uuid NOT NULL REFERENCES public.stock_allocation_plans(id) ON DELETE CASCADE,
   sales_order_id uuid NOT NULL REFERENCES public.sales_orders(id),
@@ -55,9 +55,9 @@ CREATE TABLE public.stock_allocation_plan_items (
   CHECK (approved_quantity IS NULL OR approved_quantity <= remaining_quantity)
 );
 
-CREATE INDEX idx_stock_allocation_plans_status ON public.stock_allocation_plans(status, plan_date DESC);
-CREATE INDEX idx_stock_allocation_plan_items_product ON public.stock_allocation_plan_items(product_id, unit);
-CREATE INDEX idx_stock_allocation_plan_items_order ON public.stock_allocation_plan_items(sales_order_id, sales_order_item_id);
+CREATE INDEX IF NOT EXISTS idx_stock_allocation_plans_status ON public.stock_allocation_plans(status, plan_date DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_allocation_plan_items_product ON public.stock_allocation_plan_items(product_id, unit);
+CREATE INDEX IF NOT EXISTS idx_stock_allocation_plan_items_order ON public.stock_allocation_plan_items(sales_order_id, sales_order_item_id);
 
 ALTER TABLE public.allocation_minimum_delivery_policies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stock_allocation_plans ENABLE ROW LEVEL SECURITY;
@@ -65,9 +65,13 @@ ALTER TABLE public.stock_allocation_plan_items ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.allocation_minimum_delivery_policies, public.stock_allocation_plans, public.stock_allocation_plan_items FROM anon;
 GRANT SELECT ON public.allocation_minimum_delivery_policies, public.stock_allocation_plans, public.stock_allocation_plan_items TO authenticated;
 GRANT ALL ON public.allocation_minimum_delivery_policies, public.stock_allocation_plans, public.stock_allocation_plan_items TO service_role;
+DROP POLICY IF EXISTS "Allocation operators read policies" ON public.allocation_minimum_delivery_policies;
 CREATE POLICY "Allocation operators read policies" ON public.allocation_minimum_delivery_policies FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin') OR public.has_role(auth.uid(),'moderator'));
+DROP POLICY IF EXISTS "Allocation admins manage policies" ON public.allocation_minimum_delivery_policies;
 CREATE POLICY "Allocation admins manage policies" ON public.allocation_minimum_delivery_policies FOR ALL TO authenticated USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
+DROP POLICY IF EXISTS "Allocation operators read plans" ON public.stock_allocation_plans;
 CREATE POLICY "Allocation operators read plans" ON public.stock_allocation_plans FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin') OR public.has_role(auth.uid(),'moderator'));
+DROP POLICY IF EXISTS "Allocation operators read plan items" ON public.stock_allocation_plan_items;
 CREATE POLICY "Allocation operators read plan items" ON public.stock_allocation_plan_items FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin') OR public.has_role(auth.uid(),'moderator'));
 
 CREATE OR REPLACE FUNCTION public.assert_allocation_operator()
