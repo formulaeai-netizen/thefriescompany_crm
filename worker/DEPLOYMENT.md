@@ -9,18 +9,27 @@ actual values live in `worker/.env` (git-ignored) on the host.
 
 ## 1. Required environment variables (names only)
 
-| Variable | Purpose | Safe default |
-|---|---|---|
-| `SUPABASE_URL` | Supabase project URL the worker connects to | (from the NEW project, `uclo...mbud`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service-role key for privileged reads/writes and the service-role-only RPCs (`claim_wastage_ai_processing`, `claim_due_credit_purchase_reminders`, etc.) | never printed/logged |
-| `WHATSAPP_PROVIDER` | `whatsapp-web` or `meta-cloud` | `whatsapp-web` |
-| `WHATSAPP_AUTOMATION_ENABLED` | Master on/off for the reminder scheduler | `false` |
-| `WHATSAPP_DRY_RUN` | Worker-level dry-run gate (mirrors DB `*_settings.dry_run`) | `true` |
-| `WHATSAPP_ALLOW_REAL_SEND` | Final send gate — the WhatsApp provider refuses to send unless this is `true` | `false` |
-| `WHATSAPP_SESSION_PATH` | Persistent WhatsApp-web session/auth directory | `.worker-data/whatsapp-session` |
-| `WHATSAPP_MESSAGE_DELAY_MS` | Delay between consecutive sends | `5000` |
-| `WHATSAPP_MAX_SEND_RETRIES` | Per-message send attempts | `2` |
-| `OPENAI_API_KEY` | Only needed if this host also runs OpenAI-calling code (it currently does not — wastage AI runs in the root CRM, not the worker) | n/a for this worker |
+| Variable                        | Purpose                                                                                                                                                  | Safe default                          |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `SUPABASE_URL`                  | Supabase project URL the worker connects to                                                                                                              | (from the NEW project, `uclo...mbud`) |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Service-role key for privileged reads/writes and the service-role-only RPCs (`claim_wastage_ai_processing`, `claim_due_credit_purchase_reminders`, etc.) | never printed/logged                  |
+| `WHATSAPP_PROVIDER`             | `whatsapp-web` or `meta-cloud`                                                                                                                           | `whatsapp-web`                        |
+| `WHATSAPP_AUTOMATION_ENABLED`   | Master on/off for the reminder scheduler                                                                                                                 | `false`                               |
+| `WHATSAPP_DRY_RUN`              | Worker-level dry-run gate (mirrors DB `*_settings.dry_run`)                                                                                              | `true`                                |
+| `WHATSAPP_ALLOW_REAL_SEND`      | Final send gate — the WhatsApp provider refuses to send unless this is `true`                                                                            | `false`                               |
+| `WHATSAPP_SESSION_PATH`         | Persistent WhatsApp-web session/auth directory                                                                                                           | `.worker-data/whatsapp-session`       |
+| `WHATSAPP_MESSAGE_DELAY_MS`     | Delay between consecutive sends                                                                                                                          | `5000`                                |
+| `WHATSAPP_MAX_SEND_RETRIES`     | Per-message send attempts                                                                                                                                | `2`                                   |
+| `OPENAI_API_KEY`                | Only needed if this host also runs OpenAI-calling code (it currently does not — wastage AI runs in the root CRM, not the worker)                         | n/a for this worker                   |
+| `WEB_PUSH_ENABLED`              | Enables scheduled PWA push dispatch                                                                                                                      | `false`                               |
+| `WEB_PUSH_DRY_RUN`              | Keeps push dispatch in dry-run mode                                                                                                                      | `true`                                |
+| `WEB_PUSH_VAPID_PUBLIC_KEY`     | VAPID public key for web push                                                                                                                            | configured only after key generation  |
+| `WEB_PUSH_VAPID_PRIVATE_KEY`    | VAPID private key for web push                                                                                                                           | never printed/logged                  |
+| `WEB_PUSH_SUBJECT`              | VAPID contact subject                                                                                                                                    | `mailto:admin@example.com`            |
+| `OPERATIONS_BRIEF_ENABLED`      | Enables morning/evening in-app operations brief notifications                                                                                            | `false`                               |
+| `OPERATIONS_BRIEF_MORNING_CRON` | Morning brief schedule in Asia/Karachi                                                                                                                   | `0 9 * * *`                           |
+| `OPERATIONS_BRIEF_EVENING_CRON` | Evening brief schedule in Asia/Karachi                                                                                                                   | `0 20 * * *`                          |
+| `AI_WATCHDOG_SCHEDULER_ENABLED` | Reserved gate for future periodic watchdog evaluation                                                                                                    | `false`                               |
 
 Recurring workflows are additionally gated **in the database**, not just by
 env vars — see `invoice_reminder_settings`, `operational_alert_dispatch_settings`,

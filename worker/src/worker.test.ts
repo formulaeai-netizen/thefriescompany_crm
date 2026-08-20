@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 import { loadWorkerConfig } from "./config.js";
+import { DisabledWhatsAppProvider } from "./providers/disabled-whatsapp.provider.js";
 import { MetaCloudProvider } from "./providers/meta-cloud.provider.js";
 import { assertRealSendAllowed, type WhatsAppProvider } from "./providers/whatsapp-provider.js";
 import { WhatsAppWebProvider } from "./providers/whatsapp-web.provider.js";
@@ -45,6 +46,17 @@ test("Meta provider remains disabled", async () => {
   await assert.rejects(
     () => provider.sendMessage({ to: "923001234567", body: "test" }),
     /Real WhatsApp sending is blocked/,
+  );
+});
+
+test("disabled WhatsApp provider never connects or sends", async () => {
+  const provider = new DisabledWhatsAppProvider();
+  await provider.initialize();
+  assert.equal(provider.getStatus().provider, "disabled");
+  assert.equal(provider.getStatus().qrRequired, false);
+  await assert.rejects(
+    () => provider.sendMessage({ to: "923001234567", body: "test" }),
+    /provider is disabled/,
   );
 });
 
@@ -110,6 +122,10 @@ test("queue processing does not start automatically", async () => {
     webPushVapidPublicKey: null,
     webPushVapidPrivateKey: null,
     webPushSubject: null,
+    operationsBriefEnabled: false,
+    operationsBriefMorningCron: "0 9 * * *",
+    operationsBriefEveningCron: "0 20 * * *",
+    aiWatchdogSchedulerEnabled: false,
     messageDelayMs: 0,
     maxSendRetries: 2,
     sessionPath: ".worker-data/whatsapp-session",

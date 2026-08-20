@@ -181,7 +181,7 @@ function RootComponent() {
     return () => data.subscription.unsubscribe();
   }, [router, queryClient]);
 
-  if (pathname === "/auth") {
+  if (pathname === "/auth" || pathname.startsWith("/portal")) {
     return (
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
@@ -264,6 +264,8 @@ function RoleGuard({ children }: { children: ReactNode }) {
       </div>
     );
   }
+  if (pathname.startsWith("/portal")) return <>{children}</>;
+  if (roles?.includes("customer")) return null;
   return <>{children}</>;
 }
 
@@ -335,10 +337,6 @@ function pageMeta(pathname: string): { title: string; subtitle?: string } {
       subtitle: "Branch-wise stock, invoices and receivables",
     },
     "/production": { title: "Daily Production", subtitle: "Raw input, output and variance" },
-    "/delivery-calculator": {
-      title: "Delivery Calculator",
-      subtitle: "Cost per drop across zones",
-    },
     "/expenses": { title: "Expenses", subtitle: "Costs by category and period" },
     "/pnl": { title: "Profit & Loss", subtitle: "Monthly performance & margin" },
     "/investors": { title: "Investors", subtitle: "Cap table and distributions" },

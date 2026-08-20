@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
-export type AppRole = "admin" | "staff" | "investor" | "moderator";
+export type AppRole = "admin" | "staff" | "investor" | "moderator" | "customer";
 
 /**
  * Route → allowed roles. Any authenticated route not listed here defaults to
@@ -10,14 +10,19 @@ export type AppRole = "admin" | "staff" | "investor" | "moderator";
  * land on `/inventory`, investors on `/investor`.
  */
 export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] }> = [
+  { prefix: "/portal", roles: ["customer"] },
   { prefix: "/investor", roles: ["investor", "admin"] },
   { prefix: "/inventory", roles: ["admin", "staff"] },
   { prefix: "/orders", roles: ["admin", "moderator"] },
+  { prefix: "/today", roles: ["admin", "moderator"] },
+  { prefix: "/sales-leads", roles: ["admin", "moderator"] },
+  { prefix: "/employee-performance", roles: ["admin", "moderator"] },
+  { prefix: "/investor-leads", roles: ["admin"] },
   { prefix: "/production-planning", roles: ["admin", "moderator"] },
+  { prefix: "/allocation-delivery-plan", roles: ["admin", "moderator"] },
   { prefix: "/production", roles: ["admin", "staff"] },
   { prefix: "/invoices/deleted", roles: ["admin"] },
   { prefix: "/invoices", roles: ["admin", "staff"] },
-  { prefix: "/delivery-calculator", roles: ["admin", "staff"] },
   { prefix: "/expenses", roles: ["admin", "staff"] },
   { prefix: "/returns", roles: ["admin", "staff"] },
   { prefix: "/clients", roles: ["admin"] },
@@ -62,6 +67,7 @@ export function homeForRoles(roles: AppRole[]): string {
   if (roles.includes("staff")) return "/inventory";
   if (roles.includes("investor")) return "/investor";
   if (roles.includes("moderator")) return "/wastage-verifications";
+  if (roles.includes("customer")) return "/portal";
   return "/auth";
 }
 

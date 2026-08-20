@@ -11,17 +11,21 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as InvestRouteImport } from './routes/invest'
+import { Route as PortalRouteImport } from './routes/portal'
 import { Route as TrustRouteImport } from './routes/trust'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAiWatchdogRouteImport } from './routes/_authenticated/ai-watchdog'
+import { Route as AuthenticatedAllocationDeliveryPlanRouteImport } from './routes/_authenticated/allocation-delivery-plan'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedCreditInventoryPurchasesRouteImport } from './routes/_authenticated/credit-inventory-purchases'
 import { Route as AuthenticatedCustomerAnalyticsRouteImport } from './routes/_authenticated/customer-analytics'
 import { Route as AuthenticatedCustomerLedgerRouteImport } from './routes/_authenticated/customer-ledger'
-import { Route as AuthenticatedDeliveryCalculatorRouteImport } from './routes/_authenticated/delivery-calculator'
+import { Route as AuthenticatedEmployeePerformanceRouteImport } from './routes/_authenticated/employee-performance'
 import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticated/expenses'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
 import { Route as AuthenticatedInvestorRouteImport } from './routes/_authenticated/investor'
+import { Route as AuthenticatedInvestorLeadsRouteImport } from './routes/_authenticated/investor-leads'
 import { Route as AuthenticatedOperationalAlertsRouteImport } from './routes/_authenticated/operational-alerts'
 import { Route as AuthenticatedOrdersRouteImport } from './routes/_authenticated/orders'
 import { Route as AuthenticatedPaymentRemindersRouteImport } from './routes/_authenticated/payment-reminders'
@@ -31,10 +35,15 @@ import { Route as AuthenticatedProductionRouteImport } from './routes/_authentic
 import { Route as AuthenticatedProductionPlanningRouteImport } from './routes/_authenticated/production-planning'
 import { Route as AuthenticatedReturnsRouteImport } from './routes/_authenticated/returns'
 import { Route as AuthenticatedSalariesRouteImport } from './routes/_authenticated/salaries'
+import { Route as AuthenticatedSalesLeadsRouteImport } from './routes/_authenticated/sales-leads'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedStockAuditsRouteImport } from './routes/_authenticated/stock-audits'
+import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated/today'
 import { Route as AuthenticatedWastageVerificationsRouteImport } from './routes/_authenticated/wastage-verifications'
 import { Route as AuthenticatedWhatsappLogsRouteImport } from './routes/_authenticated/whatsapp-logs'
+import { Route as PortalIndexRouteImport } from './routes/portal/index'
+import { Route as PortalLedgerRouteImport } from './routes/portal/ledger'
+import { Route as PortalOrdersRouteImport } from './routes/portal/orders'
 import { Route as AuthenticatedInvestorsIndexRouteImport } from './routes/_authenticated/investors.index'
 import { Route as AuthenticatedInvestorsIdRouteImport } from './routes/_authenticated/investors.$id'
 import { Route as AuthenticatedInvoicesIndexRouteImport } from './routes/_authenticated/invoices.index'
@@ -47,6 +56,16 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvestRoute = InvestRouteImport.update({
+  id: '/invest',
+  path: '/invest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrustRoute = TrustRouteImport.update({
@@ -64,6 +83,12 @@ const AuthenticatedAiWatchdogRoute = AuthenticatedAiWatchdogRouteImport.update({
   path: '/ai-watchdog',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAllocationDeliveryPlanRoute =
+  AuthenticatedAllocationDeliveryPlanRouteImport.update({
+    id: '/allocation-delivery-plan',
+    path: '/allocation-delivery-plan',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
@@ -87,10 +112,10 @@ const AuthenticatedCustomerLedgerRoute =
     path: '/customer-ledger',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedDeliveryCalculatorRoute =
-  AuthenticatedDeliveryCalculatorRouteImport.update({
-    id: '/delivery-calculator',
-    path: '/delivery-calculator',
+const AuthenticatedEmployeePerformanceRoute =
+  AuthenticatedEmployeePerformanceRouteImport.update({
+    id: '/employee-performance',
+    path: '/employee-performance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedExpensesRoute = AuthenticatedExpensesRouteImport.update({
@@ -108,6 +133,12 @@ const AuthenticatedInvestorRoute = AuthenticatedInvestorRouteImport.update({
   path: '/investor',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedInvestorLeadsRoute =
+  AuthenticatedInvestorLeadsRouteImport.update({
+    id: '/investor-leads',
+    path: '/investor-leads',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOperationalAlertsRoute =
   AuthenticatedOperationalAlertsRouteImport.update({
     id: '/operational-alerts',
@@ -157,6 +188,11 @@ const AuthenticatedSalariesRoute = AuthenticatedSalariesRouteImport.update({
   path: '/salaries',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSalesLeadsRoute = AuthenticatedSalesLeadsRouteImport.update({
+  id: '/sales-leads',
+  path: '/sales-leads',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -168,6 +204,11 @@ const AuthenticatedStockAuditsRoute =
     path: '/stock-audits',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedTodayRoute = AuthenticatedTodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedWastageVerificationsRoute =
   AuthenticatedWastageVerificationsRouteImport.update({
     id: '/wastage-verifications',
@@ -180,6 +221,21 @@ const AuthenticatedWhatsappLogsRoute =
     path: '/whatsapp-logs',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalLedgerRoute = PortalLedgerRouteImport.update({
+  id: '/ledger',
+  path: '/ledger',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalOrdersRoute = PortalOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => PortalRoute,
+} as any)
 const AuthenticatedInvestorsIndexRoute =
   AuthenticatedInvestorsIndexRouteImport.update({
     id: '/investors/',
@@ -208,16 +264,20 @@ const AuthenticatedInvoicesDeletedRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/invest': typeof InvestRoute
+  '/portal': typeof PortalRouteWithChildren
   '/trust': typeof TrustRoute
   '/ai-watchdog': typeof AuthenticatedAiWatchdogRoute
+  '/allocation-delivery-plan': typeof AuthenticatedAllocationDeliveryPlanRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/credit-inventory-purchases': typeof AuthenticatedCreditInventoryPurchasesRoute
   '/customer-analytics': typeof AuthenticatedCustomerAnalyticsRoute
   '/customer-ledger': typeof AuthenticatedCustomerLedgerRoute
-  '/delivery-calculator': typeof AuthenticatedDeliveryCalculatorRoute
+  '/employee-performance': typeof AuthenticatedEmployeePerformanceRoute
   '/expenses': typeof AuthenticatedExpensesRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/investor': typeof AuthenticatedInvestorRoute
+  '/investor-leads': typeof AuthenticatedInvestorLeadsRoute
   '/operational-alerts': typeof AuthenticatedOperationalAlertsRoute
   '/orders': typeof AuthenticatedOrdersRoute
   '/payment-reminders': typeof AuthenticatedPaymentRemindersRoute
@@ -227,10 +287,15 @@ export interface FileRoutesByFullPath {
   '/production-planning': typeof AuthenticatedProductionPlanningRoute
   '/returns': typeof AuthenticatedReturnsRoute
   '/salaries': typeof AuthenticatedSalariesRoute
+  '/sales-leads': typeof AuthenticatedSalesLeadsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/stock-audits': typeof AuthenticatedStockAuditsRoute
+  '/today': typeof AuthenticatedTodayRoute
   '/wastage-verifications': typeof AuthenticatedWastageVerificationsRoute
   '/whatsapp-logs': typeof AuthenticatedWhatsappLogsRoute
+  '/portal/ledger': typeof PortalLedgerRoute
+  '/portal/orders': typeof PortalOrdersRoute
+  '/portal/': typeof PortalIndexRoute
   '/investors/$id': typeof AuthenticatedInvestorsIdRoute
   '/invoices/deleted': typeof AuthenticatedInvoicesDeletedRoute
   '/investors/': typeof AuthenticatedInvestorsIndexRoute
@@ -238,16 +303,19 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
+  '/invest': typeof InvestRoute
   '/trust': typeof TrustRoute
   '/ai-watchdog': typeof AuthenticatedAiWatchdogRoute
+  '/allocation-delivery-plan': typeof AuthenticatedAllocationDeliveryPlanRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/credit-inventory-purchases': typeof AuthenticatedCreditInventoryPurchasesRoute
   '/customer-analytics': typeof AuthenticatedCustomerAnalyticsRoute
   '/customer-ledger': typeof AuthenticatedCustomerLedgerRoute
-  '/delivery-calculator': typeof AuthenticatedDeliveryCalculatorRoute
+  '/employee-performance': typeof AuthenticatedEmployeePerformanceRoute
   '/expenses': typeof AuthenticatedExpensesRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/investor': typeof AuthenticatedInvestorRoute
+  '/investor-leads': typeof AuthenticatedInvestorLeadsRoute
   '/operational-alerts': typeof AuthenticatedOperationalAlertsRoute
   '/orders': typeof AuthenticatedOrdersRoute
   '/payment-reminders': typeof AuthenticatedPaymentRemindersRoute
@@ -257,11 +325,16 @@ export interface FileRoutesByTo {
   '/production-planning': typeof AuthenticatedProductionPlanningRoute
   '/returns': typeof AuthenticatedReturnsRoute
   '/salaries': typeof AuthenticatedSalariesRoute
+  '/sales-leads': typeof AuthenticatedSalesLeadsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/stock-audits': typeof AuthenticatedStockAuditsRoute
+  '/today': typeof AuthenticatedTodayRoute
   '/wastage-verifications': typeof AuthenticatedWastageVerificationsRoute
   '/whatsapp-logs': typeof AuthenticatedWhatsappLogsRoute
+  '/portal/ledger': typeof PortalLedgerRoute
+  '/portal/orders': typeof PortalOrdersRoute
   '/': typeof AuthenticatedIndexRoute
+  '/portal': typeof PortalIndexRoute
   '/investors/$id': typeof AuthenticatedInvestorsIdRoute
   '/invoices/deleted': typeof AuthenticatedInvoicesDeletedRoute
   '/investors': typeof AuthenticatedInvestorsIndexRoute
@@ -271,16 +344,20 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/invest': typeof InvestRoute
+  '/portal': typeof PortalRouteWithChildren
   '/trust': typeof TrustRoute
   '/_authenticated/ai-watchdog': typeof AuthenticatedAiWatchdogRoute
+  '/_authenticated/allocation-delivery-plan': typeof AuthenticatedAllocationDeliveryPlanRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/credit-inventory-purchases': typeof AuthenticatedCreditInventoryPurchasesRoute
   '/_authenticated/customer-analytics': typeof AuthenticatedCustomerAnalyticsRoute
   '/_authenticated/customer-ledger': typeof AuthenticatedCustomerLedgerRoute
-  '/_authenticated/delivery-calculator': typeof AuthenticatedDeliveryCalculatorRoute
+  '/_authenticated/employee-performance': typeof AuthenticatedEmployeePerformanceRoute
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/investor': typeof AuthenticatedInvestorRoute
+  '/_authenticated/investor-leads': typeof AuthenticatedInvestorLeadsRoute
   '/_authenticated/operational-alerts': typeof AuthenticatedOperationalAlertsRoute
   '/_authenticated/orders': typeof AuthenticatedOrdersRoute
   '/_authenticated/payment-reminders': typeof AuthenticatedPaymentRemindersRoute
@@ -290,11 +367,16 @@ export interface FileRoutesById {
   '/_authenticated/production-planning': typeof AuthenticatedProductionPlanningRoute
   '/_authenticated/returns': typeof AuthenticatedReturnsRoute
   '/_authenticated/salaries': typeof AuthenticatedSalariesRoute
+  '/_authenticated/sales-leads': typeof AuthenticatedSalesLeadsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/stock-audits': typeof AuthenticatedStockAuditsRoute
+  '/_authenticated/today': typeof AuthenticatedTodayRoute
   '/_authenticated/wastage-verifications': typeof AuthenticatedWastageVerificationsRoute
   '/_authenticated/whatsapp-logs': typeof AuthenticatedWhatsappLogsRoute
+  '/portal/ledger': typeof PortalLedgerRoute
+  '/portal/orders': typeof PortalOrdersRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/_authenticated/investors/$id': typeof AuthenticatedInvestorsIdRoute
   '/_authenticated/invoices/deleted': typeof AuthenticatedInvoicesDeletedRoute
   '/_authenticated/investors/': typeof AuthenticatedInvestorsIndexRoute
@@ -305,16 +387,20 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/invest'
+    | '/portal'
     | '/trust'
     | '/ai-watchdog'
+    | '/allocation-delivery-plan'
     | '/clients'
     | '/credit-inventory-purchases'
     | '/customer-analytics'
     | '/customer-ledger'
-    | '/delivery-calculator'
+    | '/employee-performance'
     | '/expenses'
     | '/inventory'
     | '/investor'
+    | '/investor-leads'
     | '/operational-alerts'
     | '/orders'
     | '/payment-reminders'
@@ -324,10 +410,15 @@ export interface FileRouteTypes {
     | '/production-planning'
     | '/returns'
     | '/salaries'
+    | '/sales-leads'
     | '/settings'
     | '/stock-audits'
+    | '/today'
     | '/wastage-verifications'
     | '/whatsapp-logs'
+    | '/portal/ledger'
+    | '/portal/orders'
+    | '/portal/'
     | '/investors/$id'
     | '/invoices/deleted'
     | '/investors/'
@@ -335,16 +426,19 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
+    | '/invest'
     | '/trust'
     | '/ai-watchdog'
+    | '/allocation-delivery-plan'
     | '/clients'
     | '/credit-inventory-purchases'
     | '/customer-analytics'
     | '/customer-ledger'
-    | '/delivery-calculator'
+    | '/employee-performance'
     | '/expenses'
     | '/inventory'
     | '/investor'
+    | '/investor-leads'
     | '/operational-alerts'
     | '/orders'
     | '/payment-reminders'
@@ -354,11 +448,16 @@ export interface FileRouteTypes {
     | '/production-planning'
     | '/returns'
     | '/salaries'
+    | '/sales-leads'
     | '/settings'
     | '/stock-audits'
+    | '/today'
     | '/wastage-verifications'
     | '/whatsapp-logs'
+    | '/portal/ledger'
+    | '/portal/orders'
     | '/'
+    | '/portal'
     | '/investors/$id'
     | '/invoices/deleted'
     | '/investors'
@@ -367,16 +466,20 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/auth'
+    | '/invest'
+    | '/portal'
     | '/trust'
     | '/_authenticated/ai-watchdog'
+    | '/_authenticated/allocation-delivery-plan'
     | '/_authenticated/clients'
     | '/_authenticated/credit-inventory-purchases'
     | '/_authenticated/customer-analytics'
     | '/_authenticated/customer-ledger'
-    | '/_authenticated/delivery-calculator'
+    | '/_authenticated/employee-performance'
     | '/_authenticated/expenses'
     | '/_authenticated/inventory'
     | '/_authenticated/investor'
+    | '/_authenticated/investor-leads'
     | '/_authenticated/operational-alerts'
     | '/_authenticated/orders'
     | '/_authenticated/payment-reminders'
@@ -386,11 +489,16 @@ export interface FileRouteTypes {
     | '/_authenticated/production-planning'
     | '/_authenticated/returns'
     | '/_authenticated/salaries'
+    | '/_authenticated/sales-leads'
     | '/_authenticated/settings'
     | '/_authenticated/stock-audits'
+    | '/_authenticated/today'
     | '/_authenticated/wastage-verifications'
     | '/_authenticated/whatsapp-logs'
+    | '/portal/ledger'
+    | '/portal/orders'
     | '/_authenticated/'
+    | '/portal/'
     | '/_authenticated/investors/$id'
     | '/_authenticated/invoices/deleted'
     | '/_authenticated/investors/'
@@ -400,6 +508,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  InvestRoute: typeof InvestRoute
+  PortalRoute: typeof PortalRouteWithChildren
   TrustRoute: typeof TrustRoute
 }
 
@@ -417,6 +527,20 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invest': {
+      id: '/invest'
+      path: '/invest'
+      fullPath: '/invest'
+      preLoaderRoute: typeof InvestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/trust': {
@@ -438,6 +562,13 @@ declare module '@tanstack/react-router' {
       path: '/ai-watchdog'
       fullPath: '/ai-watchdog'
       preLoaderRoute: typeof AuthenticatedAiWatchdogRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/allocation-delivery-plan': {
+      id: '/_authenticated/allocation-delivery-plan'
+      path: '/allocation-delivery-plan'
+      fullPath: '/allocation-delivery-plan'
+      preLoaderRoute: typeof AuthenticatedAllocationDeliveryPlanRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/clients': {
@@ -468,11 +599,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomerLedgerRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/delivery-calculator': {
-      id: '/_authenticated/delivery-calculator'
-      path: '/delivery-calculator'
-      fullPath: '/delivery-calculator'
-      preLoaderRoute: typeof AuthenticatedDeliveryCalculatorRouteImport
+    '/_authenticated/employee-performance': {
+      id: '/_authenticated/employee-performance'
+      path: '/employee-performance'
+      fullPath: '/employee-performance'
+      preLoaderRoute: typeof AuthenticatedEmployeePerformanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/expenses': {
@@ -494,6 +625,13 @@ declare module '@tanstack/react-router' {
       path: '/investor'
       fullPath: '/investor'
       preLoaderRoute: typeof AuthenticatedInvestorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/investor-leads': {
+      id: '/_authenticated/investor-leads'
+      path: '/investor-leads'
+      fullPath: '/investor-leads'
+      preLoaderRoute: typeof AuthenticatedInvestorLeadsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/operational-alerts': {
@@ -559,6 +697,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSalariesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/sales-leads': {
+      id: '/_authenticated/sales-leads'
+      path: '/sales-leads'
+      fullPath: '/sales-leads'
+      preLoaderRoute: typeof AuthenticatedSalesLeadsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -571,6 +716,13 @@ declare module '@tanstack/react-router' {
       path: '/stock-audits'
       fullPath: '/stock-audits'
       preLoaderRoute: typeof AuthenticatedStockAuditsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/today': {
+      id: '/_authenticated/today'
+      path: '/today'
+      fullPath: '/today'
+      preLoaderRoute: typeof AuthenticatedTodayRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/wastage-verifications': {
@@ -586,6 +738,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/whatsapp-logs'
       preLoaderRoute: typeof AuthenticatedWhatsappLogsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/portal/': {
+      id: '/portal/'
+      path: '/'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/ledger': {
+      id: '/portal/ledger'
+      path: '/ledger'
+      fullPath: '/portal/ledger'
+      preLoaderRoute: typeof PortalLedgerRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/orders': {
+      id: '/portal/orders'
+      path: '/orders'
+      fullPath: '/portal/orders'
+      preLoaderRoute: typeof PortalOrdersRouteImport
+      parentRoute: typeof PortalRoute
     }
     '/_authenticated/investors/': {
       id: '/_authenticated/investors/'
@@ -620,14 +793,16 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAiWatchdogRoute: typeof AuthenticatedAiWatchdogRoute
+  AuthenticatedAllocationDeliveryPlanRoute: typeof AuthenticatedAllocationDeliveryPlanRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedCreditInventoryPurchasesRoute: typeof AuthenticatedCreditInventoryPurchasesRoute
   AuthenticatedCustomerAnalyticsRoute: typeof AuthenticatedCustomerAnalyticsRoute
   AuthenticatedCustomerLedgerRoute: typeof AuthenticatedCustomerLedgerRoute
-  AuthenticatedDeliveryCalculatorRoute: typeof AuthenticatedDeliveryCalculatorRoute
+  AuthenticatedEmployeePerformanceRoute: typeof AuthenticatedEmployeePerformanceRoute
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedInvestorRoute: typeof AuthenticatedInvestorRoute
+  AuthenticatedInvestorLeadsRoute: typeof AuthenticatedInvestorLeadsRoute
   AuthenticatedOperationalAlertsRoute: typeof AuthenticatedOperationalAlertsRoute
   AuthenticatedOrdersRoute: typeof AuthenticatedOrdersRoute
   AuthenticatedPaymentRemindersRoute: typeof AuthenticatedPaymentRemindersRoute
@@ -637,8 +812,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProductionPlanningRoute: typeof AuthenticatedProductionPlanningRoute
   AuthenticatedReturnsRoute: typeof AuthenticatedReturnsRoute
   AuthenticatedSalariesRoute: typeof AuthenticatedSalariesRoute
+  AuthenticatedSalesLeadsRoute: typeof AuthenticatedSalesLeadsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStockAuditsRoute: typeof AuthenticatedStockAuditsRoute
+  AuthenticatedTodayRoute: typeof AuthenticatedTodayRoute
   AuthenticatedWastageVerificationsRoute: typeof AuthenticatedWastageVerificationsRoute
   AuthenticatedWhatsappLogsRoute: typeof AuthenticatedWhatsappLogsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -650,15 +827,18 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAiWatchdogRoute: AuthenticatedAiWatchdogRoute,
+  AuthenticatedAllocationDeliveryPlanRoute:
+    AuthenticatedAllocationDeliveryPlanRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedCreditInventoryPurchasesRoute:
     AuthenticatedCreditInventoryPurchasesRoute,
   AuthenticatedCustomerAnalyticsRoute: AuthenticatedCustomerAnalyticsRoute,
   AuthenticatedCustomerLedgerRoute: AuthenticatedCustomerLedgerRoute,
-  AuthenticatedDeliveryCalculatorRoute: AuthenticatedDeliveryCalculatorRoute,
+  AuthenticatedEmployeePerformanceRoute: AuthenticatedEmployeePerformanceRoute,
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedInvestorRoute: AuthenticatedInvestorRoute,
+  AuthenticatedInvestorLeadsRoute: AuthenticatedInvestorLeadsRoute,
   AuthenticatedOperationalAlertsRoute: AuthenticatedOperationalAlertsRoute,
   AuthenticatedOrdersRoute: AuthenticatedOrdersRoute,
   AuthenticatedPaymentRemindersRoute: AuthenticatedPaymentRemindersRoute,
@@ -669,8 +849,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProductionPlanningRoute: AuthenticatedProductionPlanningRoute,
   AuthenticatedReturnsRoute: AuthenticatedReturnsRoute,
   AuthenticatedSalariesRoute: AuthenticatedSalariesRoute,
+  AuthenticatedSalesLeadsRoute: AuthenticatedSalesLeadsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStockAuditsRoute: AuthenticatedStockAuditsRoute,
+  AuthenticatedTodayRoute: AuthenticatedTodayRoute,
   AuthenticatedWastageVerificationsRoute:
     AuthenticatedWastageVerificationsRoute,
   AuthenticatedWhatsappLogsRoute: AuthenticatedWhatsappLogsRoute,
@@ -684,9 +866,26 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface PortalRouteChildren {
+  PortalLedgerRoute: typeof PortalLedgerRoute
+  PortalOrdersRoute: typeof PortalOrdersRoute
+  PortalIndexRoute: typeof PortalIndexRoute
+}
+
+const PortalRouteChildren: PortalRouteChildren = {
+  PortalLedgerRoute: PortalLedgerRoute,
+  PortalOrdersRoute: PortalOrdersRoute,
+  PortalIndexRoute: PortalIndexRoute,
+}
+
+const PortalRouteWithChildren =
+  PortalRoute._addFileChildren(PortalRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  InvestRoute: InvestRoute,
+  PortalRoute: PortalRouteWithChildren,
   TrustRoute: TrustRoute,
 }
 export const routeTree = rootRouteImport

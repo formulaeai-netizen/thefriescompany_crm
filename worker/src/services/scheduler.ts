@@ -17,6 +17,7 @@ import {
   logPushDispatchReport,
 } from "./push-notification-dispatch.js";
 import { logReminderRunReport, startQueueProcessor } from "./queue-processor.js";
+import { dispatchOperationsBrief, logOperationsBriefReport } from "./operations-briefs.js";
 
 export const SCHEDULER_TIMEZONE = "Asia/Karachi";
 export const DAILY_REMINDER_CRON = "0 11 * * *";
@@ -118,32 +119,63 @@ export function startWorkerScheduler(
       logPushDispatchReport(report);
     },
   );
+  const runMorningOperationsBrief = createOverlapGuardedRunner(
+    "Morning operations brief workflow",
+    async () => {
+      const report = await dispatchOperationsBrief(supabase, config, "morning");
+      logOperationsBriefReport(report);
+    },
+  );
+  const runEveningOperationsBrief = createOverlapGuardedRunner(
+    "Evening operations brief workflow",
+    async () => {
+      const report = await dispatchOperationsBrief(supabase, config, "evening");
+      logOperationsBriefReport(report);
+    },
+  );
 
-  const reminderTask = cron.schedule(DAILY_REMINDER_CRON, runReminders, {
-    timezone: SCHEDULER_TIMEZONE,
-  });
-  const alertTask = cron.schedule(ALERT_DISPATCH_CRON, runAlerts, { timezone: SCHEDULER_TIMEZONE });
-  const creditTask = cron.schedule(CREDIT_REMINDER_CRON, runCreditReminders, {
-    timezone: SCHEDULER_TIMEZONE,
-  });
+  const whatsappTasks = config.automationEnabled
+    ? [
+        cron.schedule(DAILY_REMINDER_CRON, runReminders, {
+          timezone: SCHEDULER_TIMEZONE,
+        }),
+        cron.schedule(ALERT_DISPATCH_CRON, runAlerts, { timezone: SCHEDULER_TIMEZONE }),
+        cron.schedule(CREDIT_REMINDER_CRON, runCreditReminders, {
+          timezone: SCHEDULER_TIMEZONE,
+        }),
+      ]
+    : [];
   const pushTask = config.webPushEnabled
     ? cron.schedule(PUSH_NOTIFICATION_CRON, runPushNotifications, {
         timezone: SCHEDULER_TIMEZONE,
       })
     : null;
+  const morningBriefTask = config.operationsBriefEnabled
+    ? cron.schedule(config.operationsBriefMorningCron, runMorningOperationsBrief, {
+        timezone: SCHEDULER_TIMEZONE,
+      })
+    : null;
+  const eveningBriefTask = config.operationsBriefEnabled
+    ? cron.schedule(config.operationsBriefEveningCron, runEveningOperationsBrief, {
+        timezone: SCHEDULER_TIMEZONE,
+      })
+    : null;
 
   console.info("Worker scheduler started", {
-    reminderCron: DAILY_REMINDER_CRON,
-    alertCron: ALERT_DISPATCH_CRON,
-    creditReminderCron: CREDIT_REMINDER_CRON,
+    reminderCron: config.automationEnabled ? DAILY_REMINDER_CRON : "disabled",
+    alertCron: config.automationEnabled ? ALERT_DISPATCH_CRON : "disabled",
+    creditReminderCron: config.automationEnabled ? CREDIT_REMINDER_CRON : "disabled",
     pushNotificationCron: pushTask ? PUSH_NOTIFICATION_CRON : "disabled",
+    morningBriefCron: morningBriefTask ? config.operationsBriefMorningCron : "disabled",
+    eveningBriefCron: eveningBriefTask ? config.operationsBriefEveningCron : "disabled",
+    aiWatchdogScheduler: config.aiWatchdogSchedulerEnabled ? "configured-disabled" : "disabled",
     timezone: SCHEDULER_TIMEZONE,
   });
 
   return buildSchedulerHandle([
-    reminderTask,
-    alertTask,
-    creditTask,
+    ...whatsappTasks,
     ...(pushTask ? [pushTask] : []),
+    ...(morningBriefTask ? [morningBriefTask] : []),
+    ...(eveningBriefTask ? [eveningBriefTask] : []),
   ]);
 }

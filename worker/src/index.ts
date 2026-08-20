@@ -1,4 +1,5 @@
 import { loadWorkerConfig, safeConfigSummary } from "./config.js";
+import { DisabledWhatsAppProvider } from "./providers/disabled-whatsapp.provider.js";
 import { MetaCloudProvider } from "./providers/meta-cloud.provider.js";
 import type { WhatsAppProvider } from "./providers/whatsapp-provider.js";
 import { WhatsAppWebProvider } from "./providers/whatsapp-web.provider.js";
@@ -13,8 +14,13 @@ import {
   startInboundExpenseListener,
   SupabaseExpenseIntakeRepository,
 } from "./services/inbound-expense-intake.js";
+import {
+  startInboundCustomerOrderListener,
+  SupabaseCustomerOrderRepository,
+} from "./services/inbound-customer-orders.js";
 
 function createProvider(config: ReturnType<typeof loadWorkerConfig>): WhatsAppProvider {
+  if (!config.automationEnabled) return new DisabledWhatsAppProvider();
   if (config.provider === "meta-cloud") return new MetaCloudProvider(config.allowRealSend);
   return new WhatsAppWebProvider({
     sessionPath: config.sessionPath,
@@ -31,12 +37,14 @@ async function main() {
   let scheduler: SchedulerHandle | null = null;
   let stopInboundListener: (() => void) | null = null;
   let stopExpenseIntakeListener: (() => void) | null = null;
+  let stopCustomerOrderListener: (() => void) | null = null;
 
   const shutdown = async (signal: string) => {
     console.info(`${signal} received. Stopping scheduler and disconnecting provider...`);
     scheduler?.stop();
     stopInboundListener?.();
     stopExpenseIntakeListener?.();
+    stopCustomerOrderListener?.();
     await provider.disconnect();
     process.exit(0);
   };
@@ -46,7 +54,7 @@ async function main() {
 
   await provider.initialize();
   const whatsappClient = (provider as any).client;
-  if (whatsappClient) {
+  if (config.automationEnabled && whatsappClient) {
     stopInboundListener = startInboundPaymentListener(
       whatsappClient,
       new SupabaseInboundPaymentRepository(supabase),
@@ -60,6 +68,12 @@ async function main() {
       provider,
     );
     console.info("Inbound trusted expense intake listener started");
+    stopCustomerOrderListener = startInboundCustomerOrderListener(
+      whatsappClient,
+      new SupabaseCustomerOrderRepository(supabase),
+      provider,
+    );
+    console.info("Inbound customer order listener started");
   }
   logWorkerStatus(
     buildWorkerStatus(provider.getStatus(), {

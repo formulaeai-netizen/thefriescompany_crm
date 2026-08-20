@@ -24,7 +24,6 @@ import {
   MessageSquare,
   BarChart3,
   Settings as SettingsIcon,
-  Truck,
   PlusCircle,
 } from "lucide-react";
 
@@ -39,7 +38,6 @@ const NAV = [
   { label: "Go to Inventory", to: "/inventory", icon: Package },
   { label: "Go to Daily Production", to: "/production", icon: Factory },
   { label: "Go to Invoices", to: "/invoices", icon: FileText },
-  { label: "Go to Delivery Calculator", to: "/delivery-calculator", icon: Truck },
   { label: "Go to Expenses", to: "/expenses", icon: Receipt },
   { label: "Go to P&L", to: "/pnl", icon: LineChart },
   { label: "Go to Investors", to: "/investors", icon: TrendingUp },
@@ -70,16 +68,18 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const filteredClients = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return clients.slice(0, 6);
-    return clients
-      .filter((c) => (c.legal_name ?? "").toLowerCase().includes(q))
-      .slice(0, 8);
+    return clients.filter((c) => (c.legal_name ?? "").toLowerCase().includes(q)).slice(0, 8);
   }, [clients, query]);
 
   const filteredInvoices = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return [];
     return invoices
-      .filter((i) => String(i.invoice_number ?? "").toLowerCase().includes(q))
+      .filter((i) =>
+        String(i.invoice_number ?? "")
+          .toLowerCase()
+          .includes(q),
+      )
       .slice(0, 8);
   }, [invoices, query]);
 
@@ -91,7 +91,11 @@ export function CommandPalette({ open, onOpenChange }: Props) {
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Search or type a command…" value={query} onValueChange={setQuery} />
+      <CommandInput
+        placeholder="Search or type a command…"
+        value={query}
+        onValueChange={setQuery}
+      />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
         <CommandGroup heading="Quick actions">

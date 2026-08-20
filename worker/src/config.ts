@@ -15,6 +15,10 @@ export type WorkerConfig = {
   webPushVapidPublicKey: string | null;
   webPushVapidPrivateKey: string | null;
   webPushSubject: string | null;
+  operationsBriefEnabled: boolean;
+  operationsBriefMorningCron: string;
+  operationsBriefEveningCron: string;
+  aiWatchdogSchedulerEnabled: boolean;
   sessionPath: string;
   messageDelayMs: number;
   maxSendRetries: number;
@@ -64,6 +68,10 @@ export function loadWorkerConfig(): WorkerConfig {
     webPushVapidPublicKey: process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim() || null,
     webPushVapidPrivateKey: process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim() || null,
     webPushSubject: process.env.WEB_PUSH_SUBJECT?.trim() || null,
+    operationsBriefEnabled: readBoolean("OPERATIONS_BRIEF_ENABLED", false),
+    operationsBriefMorningCron: process.env.OPERATIONS_BRIEF_MORNING_CRON?.trim() || "0 9 * * *",
+    operationsBriefEveningCron: process.env.OPERATIONS_BRIEF_EVENING_CRON?.trim() || "0 20 * * *",
+    aiWatchdogSchedulerEnabled: readBoolean("AI_WATCHDOG_SCHEDULER_ENABLED", false),
     sessionPath: path.resolve(process.cwd(), sessionPath),
     messageDelayMs: readNonNegativeInteger("WHATSAPP_MESSAGE_DELAY_MS", 5000),
     maxSendRetries: readNonNegativeInteger("WHATSAPP_MAX_SEND_RETRIES", 2),
@@ -83,6 +91,14 @@ export function safeConfigSummary(config: WorkerConfig) {
     webPushVapidConfigured: Boolean(
       config.webPushVapidPublicKey && config.webPushVapidPrivateKey && config.webPushSubject,
     ),
+    operationsBriefEnabled: config.operationsBriefEnabled,
+    operationsBriefMorningCron: config.operationsBriefEnabled
+      ? config.operationsBriefMorningCron
+      : "disabled",
+    operationsBriefEveningCron: config.operationsBriefEnabled
+      ? config.operationsBriefEveningCron
+      : "disabled",
+    aiWatchdogSchedulerEnabled: config.aiWatchdogSchedulerEnabled,
     sessionPath: config.sessionPath,
     messageDelayMs: config.messageDelayMs,
     maxSendRetries: config.maxSendRetries,
