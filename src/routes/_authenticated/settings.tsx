@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { UsersManagement } from "@/components/users-management";
 import { OpeningBalanceSettings } from "@/components/opening-balance-settings";
 import { WhatsAppRoutingSettings } from "@/components/whatsapp-routing-settings";
+import { NotificationSettings } from "@/components/notification-settings";
 import { useIsAdmin } from "@/lib/roles";
 
 const PUBLIC_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -253,6 +254,7 @@ function SettingsPage() {
         Save settings
       </Button>
 
+      <NotificationSettings />
       {isAdmin && <OpeningBalanceSettings />}
       {isAdmin && <WhatsAppRoutingSettings />}
       {isAdmin && <UsersManagement />}

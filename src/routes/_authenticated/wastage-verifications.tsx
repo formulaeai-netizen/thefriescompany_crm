@@ -289,160 +289,322 @@ function WastageVerificationsPage() {
         <CardHeader>
           <CardTitle className="text-base">Review Queue</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Production Date</TableHead>
-                <TableHead>Entered</TableHead>
-                <TableHead>AI Result</TableHead>
-                <TableHead>Expected / Actual</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
+        <CardContent className="p-0">
+          <div className="desktop-table overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                    No wastage verifications yet.
-                  </TableCell>
+                  <TableHead>Production Date</TableHead>
+                  <TableHead>Entered</TableHead>
+                  <TableHead>AI Result</TableHead>
+                  <TableHead>Expected / Actual</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                rows.map((row) => {
-                  const isOwnSubmission = row.uploaded_by === userId;
-                  const aiFailed = row.ai_result === "failed";
-                  const manualReviewAiFailure = aiFailureNeedsManualReview(row.ai_error_code);
-                  const canDecide =
-                    isAdmin &&
-                    !isOwnSubmission &&
-                    row.workflow_status === "pending_admin" &&
-                    (!aiFailed || manualReviewAiFailure);
-                  const isThisRowRetrying = retryingVerificationId === row.id;
-                  const isRetryableAiFailure =
-                    row.workflow_status === "pending_admin" && aiFailed && !manualReviewAiFailure;
-                  const canRetryAi = isAdmin && isRetryableAiFailure && !retryAi.isPending;
-                  return (
-                    <TableRow key={row.id} className="align-top">
-                      <TableCell className="text-xs text-muted-foreground">
-                        {row.daily_production?.date
-                          ? new Date(row.daily_production.date).toLocaleDateString()
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {row.staff_entered_weight} {row.staff_entered_unit}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {row.ai_result ? (
-                          <div>
-                            <div className="font-medium">{row.ai_result}</div>
-                            {row.ai_detected_weight != null && (
-                              <div className="text-muted-foreground">
-                                {row.ai_detected_weight} {row.ai_detected_unit} (
-                                {row.ai_reading_quality})
-                              </div>
-                            )}
-                            {manualReviewAiFailure && (
-                              <div className="text-muted-foreground">Manual review required</div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {Number(row.expected_wastage_kg_snapshot).toFixed(2)} kg expected
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={statusTone(row.workflow_status)}>
-                          {row.workflow_status}
-                        </Badge>
-                        {isOwnSubmission && (
-                          <div className="mt-1 text-[10px] text-muted-foreground">
-                            Your submission
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="space-x-1.5 text-right">
-                        {isAdmin && <ImageViewer verificationId={row.id} />}
-                        <EventHistory verificationId={row.id} />
-                        {isAdmin && (
-                          <>
-                            {isRetryableAiFailure && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={!canRetryAi}
-                                onClick={() => retryAi.mutate(row.id)}
-                              >
-                                {isThisRowRetrying ? "Retrying..." : "Retry AI"}
-                              </Button>
-                            )}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" disabled={!canDecide || decide.isPending}>
-                                  Approve
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No wastage verifications yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((row) => {
+                    const isOwnSubmission = row.uploaded_by === userId;
+                    const aiFailed = row.ai_result === "failed";
+                    const manualReviewAiFailure = aiFailureNeedsManualReview(row.ai_error_code);
+                    const canDecide =
+                      isAdmin &&
+                      !isOwnSubmission &&
+                      row.workflow_status === "pending_admin" &&
+                      (!aiFailed || manualReviewAiFailure);
+                    const isThisRowRetrying = retryingVerificationId === row.id;
+                    const isRetryableAiFailure =
+                      row.workflow_status === "pending_admin" && aiFailed && !manualReviewAiFailure;
+                    const canRetryAi = isAdmin && isRetryableAiFailure && !retryAi.isPending;
+                    return (
+                      <TableRow key={row.id} className="align-top">
+                        <TableCell className="text-xs text-muted-foreground">
+                          {row.daily_production?.date
+                            ? new Date(row.daily_production.date).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {row.staff_entered_weight} {row.staff_entered_unit}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {row.ai_result ? (
+                            <div>
+                              <div className="font-medium">{row.ai_result}</div>
+                              {row.ai_detected_weight != null && (
+                                <div className="text-muted-foreground">
+                                  {row.ai_detected_weight} {row.ai_detected_unit} (
+                                  {row.ai_reading_quality})
+                                </div>
+                              )}
+                              {manualReviewAiFailure && (
+                                <div className="text-muted-foreground">Manual review required</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {Number(row.expected_wastage_kg_snapshot).toFixed(2)} kg expected
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusTone(row.workflow_status)}>
+                            {row.workflow_status}
+                          </Badge>
+                          {isOwnSubmission && (
+                            <div className="mt-1 text-[10px] text-muted-foreground">
+                              Your submission
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="space-x-1.5 text-right">
+                          {isAdmin && <ImageViewer verificationId={row.id} />}
+                          <EventHistory verificationId={row.id} />
+                          {isAdmin && (
+                            <>
+                              {isRetryableAiFailure && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!canRetryAi}
+                                  onClick={() => retryAi.mutate(row.id)}
+                                >
+                                  {isThisRowRetrying ? "Retrying..." : "Retry AI"}
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Approve this wastage verification?
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This finalizes the batch's verified wastage. It does not change
-                                    the existing Wastage % on Daily Production.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() =>
-                                      decide.mutate({ verification_id: row.id, action: "approve" })
-                                    }
+                              )}
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    data-financial-action
+                                    size="sm"
+                                    disabled={!canDecide || decide.isPending}
                                   >
                                     Approve
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                            <ReasonDialog
-                              title="Reject submission"
-                              pending={decide.isPending}
-                              onConfirm={(reason) =>
-                                decide.mutate({ verification_id: row.id, action: "reject", reason })
-                              }
-                              trigger={
-                                <Button size="sm" variant="outline" disabled={!canDecide}>
-                                  Reject
-                                </Button>
-                              }
-                            />
-                            <ReasonDialog
-                              title="Request resubmission"
-                              pending={decide.isPending}
-                              onConfirm={(reason) =>
-                                decide.mutate({
-                                  verification_id: row.id,
-                                  action: "resubmission",
-                                  reason,
-                                })
-                              }
-                              trigger={
-                                <Button size="sm" variant="outline" disabled={!canDecide}>
-                                  Resubmit
-                                </Button>
-                              }
-                            />
-                          </>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Approve this wastage verification?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This finalizes the batch's verified wastage. It does not
+                                      change the existing Wastage % on Daily Production.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      data-financial-action
+                                      onClick={() =>
+                                        decide.mutate({
+                                          verification_id: row.id,
+                                          action: "approve",
+                                        })
+                                      }
+                                    >
+                                      Approve
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                              <ReasonDialog
+                                title="Reject submission"
+                                pending={decide.isPending}
+                                onConfirm={(reason) =>
+                                  decide.mutate({
+                                    verification_id: row.id,
+                                    action: "reject",
+                                    reason,
+                                  })
+                                }
+                                trigger={
+                                  <Button size="sm" variant="outline" disabled={!canDecide}>
+                                    Reject
+                                  </Button>
+                                }
+                              />
+                              <ReasonDialog
+                                title="Request resubmission"
+                                pending={decide.isPending}
+                                onConfirm={(reason) =>
+                                  decide.mutate({
+                                    verification_id: row.id,
+                                    action: "resubmission",
+                                    reason,
+                                  })
+                                }
+                                trigger={
+                                  <Button size="sm" variant="outline" disabled={!canDecide}>
+                                    Resubmit
+                                  </Button>
+                                }
+                              />
+                            </>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mobile-card-list">
+            {rows.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No wastage verifications yet.
+              </div>
+            ) : (
+              rows.map((row) => {
+                const isOwnSubmission = row.uploaded_by === userId;
+                const aiFailed = row.ai_result === "failed";
+                const manualReviewAiFailure = aiFailureNeedsManualReview(row.ai_error_code);
+                const canDecide =
+                  isAdmin &&
+                  !isOwnSubmission &&
+                  row.workflow_status === "pending_admin" &&
+                  (!aiFailed || manualReviewAiFailure);
+                const isThisRowRetrying = retryingVerificationId === row.id;
+                const isRetryableAiFailure =
+                  row.workflow_status === "pending_admin" && aiFailed && !manualReviewAiFailure;
+                const canRetryAi = isAdmin && isRetryableAiFailure && !retryAi.isPending;
+
+                return (
+                  <div key={row.id} className="mobile-data-card space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold">
+                          {row.daily_production?.date
+                            ? new Date(row.daily_production.date).toLocaleDateString()
+                            : "-"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Entered {row.staff_entered_weight} {row.staff_entered_unit}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={statusTone(row.workflow_status)}>
+                        {row.workflow_status}
+                      </Badge>
+                    </div>
+                    <div className="mobile-data-row">
+                      <span>AI Result</span>
+                      <span>{row.ai_result ?? "-"}</span>
+                    </div>
+                    <div className="mobile-data-row">
+                      <span>AI Reading</span>
+                      <span>
+                        {row.ai_detected_weight != null
+                          ? `${row.ai_detected_weight} ${row.ai_detected_unit} (${row.ai_reading_quality})`
+                          : "-"}
+                      </span>
+                    </div>
+                    <div className="mobile-data-row">
+                      <span>Expected</span>
+                      <span>{Number(row.expected_wastage_kg_snapshot).toFixed(2)} kg</span>
+                    </div>
+                    {manualReviewAiFailure && (
+                      <div className="rounded-md border border-warning/30 bg-warning/5 p-2 text-xs text-warning">
+                        Manual review required
+                      </div>
+                    )}
+                    {isOwnSubmission && (
+                      <div className="text-xs text-muted-foreground">Your submission</div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {isAdmin && <ImageViewer verificationId={row.id} />}
+                      <EventHistory verificationId={row.id} />
+                      {isAdmin && isRetryableAiFailure && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!canRetryAi}
+                          onClick={() => retryAi.mutate(row.id)}
+                        >
+                          {isThisRowRetrying ? "Retrying..." : "Retry AI"}
+                        </Button>
+                      )}
+                      {isAdmin && (
+                        <>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                data-financial-action
+                                size="sm"
+                                disabled={!canDecide || decide.isPending}
+                              >
+                                Approve
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Approve this wastage verification?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This finalizes the batch&apos;s verified wastage. It does not
+                                  change the existing Wastage % on Daily Production.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  data-financial-action
+                                  onClick={() =>
+                                    decide.mutate({ verification_id: row.id, action: "approve" })
+                                  }
+                                >
+                                  Approve
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <ReasonDialog
+                            title="Reject submission"
+                            pending={decide.isPending}
+                            onConfirm={(reason) =>
+                              decide.mutate({ verification_id: row.id, action: "reject", reason })
+                            }
+                            trigger={
+                              <Button size="sm" variant="outline" disabled={!canDecide}>
+                                Reject
+                              </Button>
+                            }
+                          />
+                          <ReasonDialog
+                            title="Request resubmission"
+                            pending={decide.isPending}
+                            onConfirm={(reason) =>
+                              decide.mutate({
+                                verification_id: row.id,
+                                action: "resubmission",
+                                reason,
+                              })
+                            }
+                            trigger={
+                              <Button size="sm" variant="outline" disabled={!canDecide}>
+                                Resubmit
+                              </Button>
+                            }
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

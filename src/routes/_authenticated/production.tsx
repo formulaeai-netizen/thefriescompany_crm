@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Trash2, Factory, AlertTriangle } from "lucide-react";
@@ -36,9 +43,19 @@ export const Route = createFileRoute("/_authenticated/production")({
 async function fetchProduction() {
   const { data, error } = await supabase
     .from("daily_production")
-    .select("*")
+    .select("*, products(id, name)")
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function fetchProducts() {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name")
+    .eq("is_active", true)
+    .order("name");
   if (error) throw error;
   return data ?? [];
 }
@@ -74,8 +91,13 @@ function ProductionPage() {
     queryKey: ["daily_production"],
     queryFn: fetchProduction,
   });
+  const { data: products = [] } = useQuery({
+    queryKey: ["products", "production-entry"],
+    queryFn: fetchProducts,
+  });
 
   const [date, setDate] = useState<Date>(new Date());
+  const [productId, setProductId] = useState("none");
   const [rawInput, setRawInput] = useState("");
   const [wastage, setWastage] = useState("60");
   const [target, setTarget] = useState("");
@@ -120,6 +142,7 @@ function ProductionPage() {
       raw_input_kg: raw,
       wastage_percent: w,
       pack_size_kg: PACK_SIZE,
+      product_id: productId === "none" ? null : productId,
       target_packs: tgt,
       notes: notes || null,
       actual_packs_produced: actual,
@@ -136,6 +159,7 @@ function ProductionPage() {
     }
     toast.success("Production logged & inventory synced");
     setRawInput("");
+    setProductId("none");
     setTarget("");
     setNotes("");
     setWastage("60");
@@ -208,6 +232,22 @@ function ProductionPage() {
                   />
                 </PopoverContent>
               </Popover>
+            </div>
+            <div>
+              <Label>Finished Product (optional)</Label>
+              <Select value={productId} onValueChange={setProductId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No product link</SelectItem>
+                  {products.map((product: any) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Raw Potato Input (kg)</Label>
@@ -352,6 +392,7 @@ function ProductionPage() {
               </div>
             </div>
             <Button
+              data-financial-action
               onClick={save}
               className="w-full bg-[#F59E0B] text-[#0A0F1E] hover:bg-[#D97706]"
             >
@@ -371,6 +412,7 @@ function ProductionPage() {
               <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Product</th>
                   <th className="px-4 py-3 text-right">Raw (kg)</th>
                   <th className="px-4 py-3 text-right">Wastage %</th>
                   <th className="px-4 py-3 text-right">Usable (kg)</th>
@@ -387,7 +429,7 @@ function ProductionPage() {
               <tbody className="divide-y divide-border">
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="px-4 py-10 text-center text-muted-foreground">
+                    <td colSpan={13} className="px-4 py-10 text-center text-muted-foreground">
                       No production entries yet.
                     </td>
                   </tr>
@@ -418,6 +460,9 @@ function ProductionPage() {
                   return (
                     <tr key={r.id} className="hover:bg-muted/30">
                       <td className="px-4 py-3">{format(new Date(r.date), "dd MMM yyyy")}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {r.products?.name ?? "Unlinked"}
+                      </td>
                       <td className="px-4 py-3 text-right tabular">
                         {fmt(Number(r.raw_input_kg))}
                       </td>
@@ -486,7 +531,7 @@ function ProductionPage() {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => del(r.id)}>
+                                <AlertDialogAction data-financial-action onClick={() => del(r.id)}>
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
@@ -520,9 +565,14 @@ function ProductionPage() {
               return (
                 <div key={r.id} className="space-y-3 rounded-xl border border-border bg-card p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-foreground">
-                      {format(new Date(r.date), "dd MMM yyyy")}
-                    </span>
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">
+                        {format(new Date(r.date), "dd MMM yyyy")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {r.products?.name ?? "Unlinked product"}
+                      </div>
+                    </div>
                     {fl ? (
                       <Badge variant="outline" className={fl.className}>
                         {fl.label}
@@ -617,7 +667,9 @@ function ProductionPage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => del(r.id)}>Delete</AlertDialogAction>
+                            <AlertDialogAction data-financial-action onClick={() => del(r.id)}>
+                              Delete
+                            </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>

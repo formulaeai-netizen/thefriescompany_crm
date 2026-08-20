@@ -12,12 +12,17 @@ import {
   runCreditPurchaseDispatchWorkflow,
   SupabaseCreditPurchaseDispatchRepository,
 } from "./credit-purchase-dispatch.js";
+import {
+  dispatchPendingPushNotifications,
+  logPushDispatchReport,
+} from "./push-notification-dispatch.js";
 import { logReminderRunReport, startQueueProcessor } from "./queue-processor.js";
 
 export const SCHEDULER_TIMEZONE = "Asia/Karachi";
 export const DAILY_REMINDER_CRON = "0 11 * * *";
 export const ALERT_DISPATCH_CRON = "*/30 * * * *";
 export const CREDIT_REMINDER_CRON = "0 * * * *";
+export const PUSH_NOTIFICATION_CRON = "* * * * *";
 
 export type SchedulerHandle = {
   stop(): void;
@@ -106,6 +111,13 @@ export function startWorkerScheduler(
       logCreditPurchaseDispatchReport(report);
     },
   );
+  const runPushNotifications = createOverlapGuardedRunner(
+    "PWA push notification workflow",
+    async () => {
+      const report = await dispatchPendingPushNotifications(supabase, config);
+      logPushDispatchReport(report);
+    },
+  );
 
   const reminderTask = cron.schedule(DAILY_REMINDER_CRON, runReminders, {
     timezone: SCHEDULER_TIMEZONE,
@@ -114,13 +126,24 @@ export function startWorkerScheduler(
   const creditTask = cron.schedule(CREDIT_REMINDER_CRON, runCreditReminders, {
     timezone: SCHEDULER_TIMEZONE,
   });
+  const pushTask = config.webPushEnabled
+    ? cron.schedule(PUSH_NOTIFICATION_CRON, runPushNotifications, {
+        timezone: SCHEDULER_TIMEZONE,
+      })
+    : null;
 
   console.info("Worker scheduler started", {
     reminderCron: DAILY_REMINDER_CRON,
     alertCron: ALERT_DISPATCH_CRON,
     creditReminderCron: CREDIT_REMINDER_CRON,
+    pushNotificationCron: pushTask ? PUSH_NOTIFICATION_CRON : "disabled",
     timezone: SCHEDULER_TIMEZONE,
   });
 
-  return buildSchedulerHandle([reminderTask, alertTask, creditTask]);
+  return buildSchedulerHandle([
+    reminderTask,
+    alertTask,
+    creditTask,
+    ...(pushTask ? [pushTask] : []),
+  ]);
 }

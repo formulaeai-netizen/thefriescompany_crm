@@ -137,6 +137,23 @@ test("paid invoice is rejected", () => {
   assert.equal(report.skipped_paid, 1);
 });
 
+test("awaiting receiving invoice is not collectible and never reminder eligible", () => {
+  assert.equal(
+    calculateOutstandingAmount({
+      amount: 6000,
+      amount_received: 0,
+      payment_status: "Not Done",
+      receiving_status: "awaiting_receiving",
+    }),
+    0,
+  );
+
+  const report = buildSingle({ receiving_status: "awaiting_receiving" });
+  assert.equal(report.eligible_count, 0);
+  assert.equal(report.pending_rows.length, 0);
+  assert.equal(report.sample_preview_rows[0].skip_reason, "awaiting_receiving");
+});
+
 test("partial invoice with outstanding amount is accepted", () => {
   const report = buildSingle({ payment_status: "Partial", amount: 10000, amount_received: 3500 });
 

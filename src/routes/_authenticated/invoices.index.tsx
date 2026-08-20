@@ -67,6 +67,13 @@ function statusBadge(s: string) {
   return map[s] ?? "";
 }
 
+const PACK_SIZE_KG = 2.5;
+
+function formatQuantityInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
+}
+
 const EXPORT_HEADERS = [
   "Invoice No",
   "Client",
@@ -75,6 +82,7 @@ const EXPORT_HEADERS = [
   "Date",
   "Due Date",
   "Weight (kg)",
+  "Packets",
   "Unit Price",
   "Amount",
   "Amount Received",
@@ -90,6 +98,7 @@ function invoiceToCsvRow(i: any): Array<string | number | null> {
     i.date ? String(i.date).slice(0, 10) : "",
     i.due_date ? String(i.due_date).slice(0, 10) : "",
     i.weight_kg ?? "",
+    i.no_of_packs ?? "",
     i.unit_price ?? "",
     i.amount ?? "",
     i.amount_received ?? "",
@@ -273,6 +282,7 @@ function InvoicesPage() {
         sales_rep_phone: settings?.sales_rep_phone,
         unit_price: i.unit_price,
         weight_kg: i.weight_kg,
+        no_of_packs: i.no_of_packs,
       });
     } catch (e: any) {
       toast.error("Failed to generate PDF: " + e.message);
@@ -334,7 +344,7 @@ function InvoicesPage() {
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full md:w-auto">
+              <Button className="w-full md:w-auto" data-financial-action>
                 <Plus className="mr-1 h-4 w-4" /> New invoice
               </Button>
             </DialogTrigger>
@@ -422,6 +432,7 @@ function InvoicesPage() {
                   <th className="px-4 py-3 text-left">Due</th>
                   <th className="px-4 py-3 text-right">Amount</th>
                   <th className="px-4 py-3 text-right">Weight</th>
+                  <th className="px-4 py-3 text-right">Packets</th>
                   <th className="px-4 py-3 text-right">Rate</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3"></th>
@@ -490,6 +501,9 @@ function InvoicesPage() {
                       {i.weight_kg != null ? `${i.weight_kg} kg` : "-"}
                     </td>
                     <td className="tabular px-4 py-3 text-right text-muted-foreground">
+                      {i.no_of_packs != null ? `${i.no_of_packs} packs` : "-"}
+                    </td>
+                    <td className="tabular px-4 py-3 text-right text-muted-foreground">
                       {i.unit_price != null
                         ? `Rs. ${Number(i.unit_price).toLocaleString()}/kg`
                         : "-"}
@@ -550,7 +564,10 @@ function InvoicesPage() {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteInvoice.mutate(i.id)}>
+                                <AlertDialogAction
+                                  data-financial-action
+                                  onClick={() => deleteInvoice.mutate(i.id)}
+                                >
                                   Archive
                                 </AlertDialogAction>
                               </AlertDialogFooter>
@@ -601,6 +618,7 @@ function InvoicesPage() {
             {(i.weight_kg != null || i.unit_price != null) && (
               <div className="text-xs text-muted-foreground">
                 {i.weight_kg != null ? `${i.weight_kg} kg` : ""}
+                {i.no_of_packs != null ? ` / ${i.no_of_packs} packs` : ""}
                 {i.unit_price != null ? ` x Rs. ${Number(i.unit_price).toLocaleString()}/kg` : ""}
               </div>
             )}
@@ -652,7 +670,10 @@ function InvoicesPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => deleteInvoice.mutate(i.id)}>
+                      <AlertDialogAction
+                        data-financial-action
+                        onClick={() => deleteInvoice.mutate(i.id)}
+                      >
                         Archive
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -683,7 +704,10 @@ function NewInvoiceDialog({
   const [overriding, setOverriding] = useState(false);
   const [unitPrice, setUnitPrice] = useState("");
   const [weightKg, setWeightKg] = useState("");
+  const [noOfPacks, setNoOfPacks] = useState("");
   const [item, setItem] = useState("");
+  const [addingNewBranch, setAddingNewBranch] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
   const [addingNewFlavor, setAddingNewFlavor] = useState(false);
   const [newFlavorName, setNewFlavorName] = useState("");
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().slice(0, 10));
@@ -726,12 +750,62 @@ function NewInvoiceDialog({
   const client = clients.find((c) => c.id === clientId);
   const branches = client?.branches ?? [];
 
+  const addBranch = useMutation({
+    mutationFn: async (name: string) => {
+      if (!clientId || !client) throw new Error("Pick a client first");
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Enter a branch name");
+      const existing = branches.find(
+        (branch: any) =>
+          String(branch.branch_name ?? "")
+            .trim()
+            .toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (existing) return existing as { id: string; branch_name: string; city?: string | null };
+
+      const { data, error } = await supabase
+        .from("branches")
+        .insert({
+          client_id: clientId,
+          branch_name: trimmed,
+          city: client.city ?? null,
+        })
+        .select("id,branch_name,city")
+        .single();
+      if (error) throw error;
+      return data as { id: string; branch_name: string; city?: string | null };
+    },
+    onSuccess: (row) => {
+      qc.invalidateQueries({ queryKey: ["clients"] });
+      setBranchId(row.id);
+      setAddingNewBranch(false);
+      setNewBranchName("");
+      toast.success(`Selected branch ${row.branch_name}`);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to add branch"),
+  });
+
   const wtNum = Number(weightKg);
+  const packsNum = Number(noOfPacks);
   const upNum = Number(unitPrice);
   const computedTotal = wtNum > 0 && upNum > 0 ? wtNum * upNum : null;
   const finalAmount = overriding ? Number(amountOverride) : (computedTotal ?? 0);
   const weightInvalid = weightKg !== "" && (!Number.isFinite(wtNum) || wtNum <= 0);
-  const canSubmit = !!clientId && !!item && wtNum > 0 && !weightInvalid && finalAmount > 0;
+  const packsInvalid = noOfPacks !== "" && (!Number.isFinite(packsNum) || packsNum <= 0);
+  const canSubmit =
+    !!clientId && !!item && wtNum > 0 && !weightInvalid && !packsInvalid && finalAmount > 0;
+
+  const handleWeightChange = (value: string) => {
+    setWeightKg(value);
+    const nextWeight = Number(value);
+    setNoOfPacks(formatQuantityInput(nextWeight / PACK_SIZE_KG));
+  };
+
+  const handlePacksChange = (value: string) => {
+    setNoOfPacks(value);
+    const nextPacks = Number(value);
+    setWeightKg(formatQuantityInput(nextPacks * PACK_SIZE_KG));
+  };
 
   const submit = async () => {
     if (!clientId) return toast.error("Pick a client");
@@ -745,6 +819,7 @@ function NewInvoiceDialog({
       amount: finalAmount,
       unit_price: upNum > 0 ? upNum : null,
       weight_kg: wtNum > 0 ? wtNum : null,
+      no_of_packs: packsNum > 0 ? packsNum : null,
       item,
       date: deliveryDate,
       delivery_date: deliveryDate,
@@ -784,6 +859,8 @@ function NewInvoiceDialog({
             onValueChange={(v) => {
               setClientId(v);
               setBranchId("");
+              setAddingNewBranch(false);
+              setNewBranchName("");
             }}
           >
             <SelectTrigger>
@@ -800,21 +877,72 @@ function NewInvoiceDialog({
             </SelectContent>
           </Select>
         </div>
-        {branches.length > 0 && (
+        {clientId && (
           <div>
             <Label>Branch</Label>
-            <Select value={branchId} onValueChange={setBranchId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((b: any) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.branch_name}
+            {addingNewBranch ? (
+              <div className="flex gap-2">
+                <Input
+                  autoFocus
+                  value={newBranchName}
+                  onChange={(e) => setNewBranchName(e.target.value)}
+                  placeholder="e.g. Zakariya"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addBranch.mutate(newBranchName);
+                    }
+                    if (e.key === "Escape") {
+                      setAddingNewBranch(false);
+                      setNewBranchName("");
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  onClick={() => addBranch.mutate(newBranchName)}
+                  disabled={!newBranchName.trim() || addBranch.isPending}
+                >
+                  Save
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setAddingNewBranch(false);
+                    setNewBranchName("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Select
+                value={branchId || "__none__"}
+                onValueChange={(v) => {
+                  if (v === "__add_new_branch__") {
+                    setAddingNewBranch(true);
+                    return;
+                  }
+                  setBranchId(v === "__none__" ? "" : v);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No branch</SelectItem>
+                  {branches.map((b: any) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.branch_name}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__add_new_branch__" className="font-medium text-primary">
+                    + Add New Branch
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         )}
         <div>
@@ -882,10 +1010,15 @@ function NewInvoiceDialog({
             </Select>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <Label>Pack Size</Label>
-            <Input value="2.5 kg" readOnly disabled className="bg-muted text-muted-foreground" />
+            <Input
+              value={`${PACK_SIZE_KG} kg`}
+              readOnly
+              disabled
+              className="bg-muted text-muted-foreground"
+            />
           </div>
           <div>
             <Label>Weight (kg)</Label>
@@ -894,9 +1027,21 @@ function NewInvoiceDialog({
               step="0.1"
               min="0"
               value={weightKg}
-              onChange={(e) => setWeightKg(e.target.value)}
+              onChange={(e) => handleWeightChange(e.target.value)}
               placeholder="e.g. 11"
               className={weightInvalid ? "border-destructive focus-visible:ring-destructive" : ""}
+            />
+          </div>
+          <div>
+            <Label>Packets</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={noOfPacks}
+              onChange={(e) => handlePacksChange(e.target.value)}
+              placeholder="Auto"
+              className={packsInvalid ? "border-destructive focus-visible:ring-destructive" : ""}
             />
           </div>
         </div>
@@ -950,6 +1095,7 @@ function NewInvoiceDialog({
           Due date auto-set to delivery date + 15 days.
         </p>
         <Button
+          data-financial-action
           onClick={submit}
           disabled={!canSubmit}
           className="w-full bg-amber-500 text-black hover:bg-amber-600 disabled:opacity-50"

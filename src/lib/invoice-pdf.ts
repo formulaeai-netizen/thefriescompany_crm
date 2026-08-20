@@ -16,9 +16,16 @@ export interface InvoicePdfData {
   sales_rep_phone?: string | null;
   unit_price?: number | null;
   weight_kg?: number | null;
+  no_of_packs?: number | null;
   city?: string | null;
   // Optional multi-line support. When provided, replaces the single item row.
-  lines?: Array<{ item: string; weight_kg?: number | null; unit_price?: number | null; amount: number }>;
+  lines?: Array<{
+    item: string;
+    weight_kg?: number | null;
+    no_of_packs?: number | null;
+    unit_price?: number | null;
+    amount: number;
+  }>;
 }
 
 function fmtNum(n: number | null | undefined): string {
@@ -30,7 +37,20 @@ function fmtShortDate(d: string | null | undefined): string {
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return String(d);
   const dd = String(dt.getDate()).padStart(2, "0");
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const mm = months[dt.getMonth()];
   const yy = dt.getFullYear();
   return `${dd} ${mm} ${yy}`;
@@ -57,20 +77,33 @@ export function generateInvoiceHTML(data: InvoicePdfData, _origin?: string): str
   const logoScreen = toAbsolute(logoScreenUrl);
   const logoPrint = toAbsolute(logoNavyUrl);
 
-  const lines = data.lines && data.lines.length > 0
-    ? data.lines
-    : [{ item: data.item ?? "—", weight_kg: data.weight_kg ?? null, unit_price: data.unit_price ?? null, amount: Number(data.amount) }];
+  const lines =
+    data.lines && data.lines.length > 0
+      ? data.lines
+      : [
+          {
+            item: data.item ?? "—",
+            weight_kg: data.weight_kg ?? null,
+            no_of_packs: data.no_of_packs ?? null,
+            unit_price: data.unit_price ?? null,
+            amount: Number(data.amount),
+          },
+        ];
 
-  const rowsHtml = lines.map((ln) => {
-    const w = ln.weight_kg != null ? `${ln.weight_kg} kg` : "—";
-    const r = ln.unit_price != null ? `Rs. ${fmtNum(Number(ln.unit_price))}/kg` : "—";
-    return `<tr>
+  const rowsHtml = lines
+    .map((ln) => {
+      const w = ln.weight_kg != null ? `${ln.weight_kg} kg` : "—";
+      const packs = ln.no_of_packs != null ? `${ln.no_of_packs} packs` : "—";
+      const r = ln.unit_price != null ? `Rs. ${fmtNum(Number(ln.unit_price))}/kg` : "—";
+      return `<tr>
       <td>${esc(ln.item || "—")}</td>
       <td>${esc(w)}</td>
+      <td>${esc(packs)}</td>
       <td>${esc(r)}</td>
       <td class="total-cell">Rs. ${fmtNum(ln.amount)}</td>
     </tr>`;
-  }).join("");
+    })
+    .join("");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -270,6 +303,7 @@ export function generateInvoiceHTML(data: InvoicePdfData, _origin?: string): str
           <tr>
             <th>Item</th>
             <th>Weight</th>
+            <th>Packets</th>
             <th>Rate</th>
             <th>Total</th>
           </tr>
@@ -343,7 +377,11 @@ export async function downloadInvoicePdf(data: InvoicePdfData): Promise<void> {
       const win = iframe.contentWindow;
       if (!win) return;
       // Set the document title so the saved PDF filename defaults to the invoice number.
-      try { win.document.title = `Invoice-${data.invoice_no}`; } catch {}
+      try {
+        win.document.title = `Invoice-${data.invoice_no}`;
+      } catch {
+        // Some browsers prevent title updates inside print iframes.
+      }
       win.focus();
       win.print();
     } finally {

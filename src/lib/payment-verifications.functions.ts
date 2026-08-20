@@ -8,6 +8,7 @@ const requestIdSchema = z.object({
 
 const approveRequestSchema = requestIdSchema.extend({
   selected_invoice_id: z.string().uuid().nullable().optional(),
+  account_id: z.string().uuid(),
 });
 
 async function assertAdmin(ctx: any) {
@@ -27,7 +28,7 @@ export const listPaymentVerificationRequests = createServerFn({ method: "GET" })
     const { data, error } = await (context.supabase as any)
       .from("payment_verification_requests")
       .select(
-        "id, client_id, invoice_id, sender_phone, incoming_message, storage_path, media_mimetype, media_filename, media_size_bytes, status, reviewed_at, created_at, claimed_amount, parsed_invoice_reference, inbound_message_id, normalized_sender_phone, normalized_command, rejection_reason, approved_cash_entry_id, clients(legal_name), invoices(invoice_no, amount, amount_received, payment_status), cash_ledger_entries!payment_verification_requests_approved_cash_entry_id_fkey(id, amount, created_at)",
+        "id, client_id, invoice_id, sender_phone, incoming_message, storage_path, media_mimetype, media_filename, media_size_bytes, status, reviewed_at, created_at, claimed_amount, parsed_invoice_reference, inbound_message_id, normalized_sender_phone, normalized_command, rejection_reason, approved_cash_entry_id, approved_account_id, clients(legal_name), invoices(invoice_no, amount, amount_received, payment_status), cash_ledger_entries!payment_verification_requests_approved_cash_entry_id_fkey(id, amount, created_at, account_id)",
       )
       .order("created_at", { ascending: false })
       .limit(200);
@@ -45,11 +46,12 @@ export const listPaymentVerificationRequests = createServerFn({ method: "GET" })
       const { data: invoices, error: invoicesError } = await (context.supabase as any)
         .from("invoices")
         .select(
-          "id, client_id, invoice_no, due_date, amount, amount_received, payment_status, is_deleted",
+          "id, client_id, invoice_no, due_date, amount, amount_received, payment_status, receiving_status, is_deleted",
         )
         .in("client_id", clientIds)
         .neq("payment_status", "Done")
         .or("is_deleted.is.null,is_deleted.eq.false")
+        .or("receiving_status.is.null,receiving_status.neq.awaiting_receiving")
         .order("due_date", { ascending: true, nullsFirst: false });
 
       if (invoicesError) {
@@ -74,6 +76,7 @@ export const approvePaymentVerificationRequest = createServerFn({ method: "POST"
     const { error } = await (context.supabase as any).rpc("approve_payment_verification_request", {
       _request_id: data.request_id,
       _selected_invoice_id: data.selected_invoice_id ?? null,
+      _account_id: data.account_id,
     });
     if (error) throw new Error(`Payment verification approval failed: ${error.message}`);
     return { ok: true };

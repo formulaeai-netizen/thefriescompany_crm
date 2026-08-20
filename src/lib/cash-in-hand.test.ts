@@ -62,9 +62,10 @@ test("cash in hand formula includes opening balance, credits, expenses, inventor
     inventoryPurchasesPaidTotal: 3000,
     paidSalariesTotal: 12000,
     salaryAdvancesPaidTotal: 2000,
+    accountTransfersTotal: 1000,
     adjustmentsTotal: 500,
   });
-  assert.equal(result, 10000 + 25000 - 8000 - 3000 - 12000 - 2000 + 500);
+  assert.equal(result, 10000 + 25000 - 8000 - 3000 - 12000 - 2000 + 1000 + 500);
 });
 
 test("expenses subtract without any approval concept - no filtering applied here", () => {
@@ -78,6 +79,7 @@ test("expenses subtract without any approval concept - no filtering applied here
     inventoryPurchasesPaidTotal: 0,
     paidSalariesTotal: 0,
     salaryAdvancesPaidTotal: 0,
+    accountTransfersTotal: 0,
     adjustmentsTotal: 0,
   });
   assert.equal(result, -500);
@@ -91,6 +93,7 @@ test("a salary advance paid out reduces cash in hand exactly once, distinguishab
     inventoryPurchasesPaidTotal: 0,
     paidSalariesTotal: 0,
     salaryAdvancesPaidTotal: 10000,
+    accountTransfersTotal: 0,
     adjustmentsTotal: 0,
   });
   assert.equal(withAdvance, 90000);
@@ -104,8 +107,9 @@ test("buildCashInHandDisplayRows produces the same fixed row order for dashboard
     inventory_purchases_paid_total: 3000,
     paid_salaries_total: 12000,
     salary_advances_paid_total: 2000,
+    account_transfers_total: 1000,
     adjustments_total: 500,
-    cash_in_hand: 10500,
+    cash_in_hand: 11500,
   };
   const rows = buildCashInHandDisplayRows(summary);
 
@@ -118,6 +122,7 @@ test("buildCashInHandDisplayRows produces the same fixed row order for dashboard
       "inventory_purchases_paid_total",
       "paid_salaries_total",
       "salary_advances_paid_total",
+      "account_transfers_total",
       "adjustments_total",
       "cash_in_hand",
     ],
@@ -128,7 +133,8 @@ test("buildCashInHandDisplayRows produces the same fixed row order for dashboard
   assert.equal(rows.find((r) => r.key === "inventory_purchases_paid_total")?.value, -3000);
   assert.equal(rows.find((r) => r.key === "paid_salaries_total")?.value, -12000);
   assert.equal(rows.find((r) => r.key === "salary_advances_paid_total")?.value, -2000);
+  assert.equal(rows.find((r) => r.key === "account_transfers_total")?.value, 1000);
   assert.equal(rows.find((r) => r.key === "adjustments_total")?.value, 500);
-  assert.equal(rows.find((r) => r.key === "cash_in_hand")?.value, 10500);
+  assert.equal(rows.find((r) => r.key === "cash_in_hand")?.value, 11500);
   assert.equal(rows.find((r) => r.key === "cash_in_hand")?.emphasize, true);
 });

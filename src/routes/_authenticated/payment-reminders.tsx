@@ -209,7 +209,7 @@ function PaymentRemindersPage() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => createPending.mutate()}>
+                <AlertDialogAction data-financial-action onClick={() => createPending.mutate()}>
                   Confirm pending queue
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -335,58 +335,112 @@ function PaymentRemindersPage() {
         <CardHeader>
           <CardTitle className="text-base">Preview</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Due</TableHead>
-                <TableHead>Days</TableHead>
-                <TableHead className="text-right">Outstanding</TableHead>
-                <TableHead>Original phone</TableHead>
-                <TableHead>Normalized</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(report?.sample_preview_rows ?? []).length === 0 ? (
+        <CardContent className="p-0">
+          <div className="desktop-table overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
-                    No preview rows yet.
-                  </TableCell>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Due</TableHead>
+                  <TableHead>Days</TableHead>
+                  <TableHead className="text-right">Outstanding</TableHead>
+                  <TableHead>Original phone</TableHead>
+                  <TableHead>Normalized</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ) : (
-                report!.sample_preview_rows.map((row: any) => (
-                  <TableRow key={`${row.invoice_id}-${row.skip_reason ?? row.reminder_stage}`}>
-                    <TableCell>{row.client_name ?? "-"}</TableCell>
-                    <TableCell className="font-mono text-xs">{row.invoice_no ?? "-"}</TableCell>
-                    <TableCell>{row.due_date ? fmtDate(row.due_date) : "-"}</TableCell>
-                    <TableCell className="tabular">{row.days_overdue}</TableCell>
-                    <TableCell className="tabular text-right">
-                      {pkr(row.outstanding_amount)}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{row.original_phone ?? "-"}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {row.normalized_phone ?? "-"}
-                    </TableCell>
-                    <TableCell>{row.reminder_stage ?? "-"}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          row.eligibility === "eligible" ? "border-success/30 text-success" : ""
-                        }
-                      >
-                        {row.eligibility === "eligible" ? "eligible" : row.skip_reason}
-                      </Badge>
+              </TableHeader>
+              <TableBody>
+                {(report?.sample_preview_rows ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No preview rows yet.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  report!.sample_preview_rows.map((row: any) => (
+                    <TableRow key={`${row.invoice_id}-${row.skip_reason ?? row.reminder_stage}`}>
+                      <TableCell>{row.client_name ?? "-"}</TableCell>
+                      <TableCell className="font-mono text-xs">{row.invoice_no ?? "-"}</TableCell>
+                      <TableCell>{row.due_date ? fmtDate(row.due_date) : "-"}</TableCell>
+                      <TableCell className="tabular">{row.days_overdue}</TableCell>
+                      <TableCell className="tabular text-right">
+                        {pkr(row.outstanding_amount)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {row.original_phone ?? "-"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {row.normalized_phone ?? "-"}
+                      </TableCell>
+                      <TableCell>{row.reminder_stage ?? "-"}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            row.eligibility === "eligible" ? "border-success/30 text-success" : ""
+                          }
+                        >
+                          {row.eligibility === "eligible" ? "eligible" : row.skip_reason}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mobile-card-list">
+            {(report?.sample_preview_rows ?? []).length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No preview rows yet.
+              </div>
+            ) : (
+              report!.sample_preview_rows.map((row: any) => (
+                <div
+                  key={`${row.invoice_id}-${row.skip_reason ?? row.reminder_stage}`}
+                  className="mobile-data-card"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{row.client_name ?? "-"}</div>
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {row.invoice_no ?? "-"}
+                      </div>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={
+                        row.eligibility === "eligible" ? "border-success/30 text-success" : ""
+                      }
+                    >
+                      {row.eligibility === "eligible" ? "eligible" : row.skip_reason}
+                    </Badge>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Due</span>
+                    <span>{row.due_date ? fmtDate(row.due_date) : "-"}</span>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Days</span>
+                    <span>{row.days_overdue}</span>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Outstanding</span>
+                    <span className="font-semibold">{pkr(row.outstanding_amount)}</span>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Stage</span>
+                    <span>{row.reminder_stage ?? "-"}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -398,45 +452,87 @@ function PaymentRemindersPage() {
             Refresh
           </Button>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Due</TableHead>
-                <TableHead className="text-right">Outstanding</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(pendingQ.data ?? []).length === 0 ? (
+        <CardContent className="p-0">
+          <div className="desktop-table overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                    No pending reminders.
-                  </TableCell>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Due</TableHead>
+                  <TableHead className="text-right">Outstanding</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
                 </TableRow>
-              ) : (
-                (pendingQ.data ?? []).map((row: any) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{pendingClientName(row)}</TableCell>
-                    <TableCell className="font-mono text-xs">{pendingInvoiceNo(row)}</TableCell>
-                    <TableCell>{fmtDate(row.due_date_snapshot)}</TableCell>
-                    <TableCell className="tabular text-right">
-                      {pkr(Number(row.outstanding_amount_snapshot ?? 0))}
+              </TableHeader>
+              <TableBody>
+                {(pendingQ.data ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No pending reminders.
                     </TableCell>
-                    <TableCell>{row.reminder_stage}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{row.status}</Badge>
-                    </TableCell>
-                    <TableCell>{fmtDate(row.created_at)}</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  (pendingQ.data ?? []).map((row: any) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{pendingClientName(row)}</TableCell>
+                      <TableCell className="font-mono text-xs">{pendingInvoiceNo(row)}</TableCell>
+                      <TableCell>{fmtDate(row.due_date_snapshot)}</TableCell>
+                      <TableCell className="tabular text-right">
+                        {pkr(Number(row.outstanding_amount_snapshot ?? 0))}
+                      </TableCell>
+                      <TableCell>{row.reminder_stage}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{row.status}</Badge>
+                      </TableCell>
+                      <TableCell>{fmtDate(row.created_at)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mobile-card-list">
+            {(pendingQ.data ?? []).length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No pending reminders.
+              </div>
+            ) : (
+              (pendingQ.data ?? []).map((row: any) => (
+                <div key={row.id} className="mobile-data-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{pendingClientName(row)}</div>
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {pendingInvoiceNo(row)}
+                      </div>
+                    </div>
+                    <Badge variant="outline">{row.status}</Badge>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Due</span>
+                    <span>{fmtDate(row.due_date_snapshot)}</span>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Outstanding</span>
+                    <span>{pkr(Number(row.outstanding_amount_snapshot ?? 0))}</span>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Stage</span>
+                    <span>{row.reminder_stage}</span>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Created</span>
+                    <span>{fmtDate(row.created_at)}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 

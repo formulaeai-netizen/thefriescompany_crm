@@ -30,6 +30,7 @@ export type InboundInvoice = {
   amount: number | string | null;
   amount_received: number | string | null;
   payment_status: string | null;
+  receiving_status?: string | null;
   is_deleted: boolean | null;
 };
 
@@ -133,6 +134,7 @@ function toFiniteMoney(value: number | string | null | undefined): number {
 }
 
 function calculateOutstanding(invoice: InboundInvoice): number {
+  if (invoice.receiving_status === "awaiting_receiving") return 0;
   if (invoice.payment_status === "Done") return 0;
   return Math.max(toFiniteMoney(invoice.amount) - toFiniteMoney(invoice.amount_received), 0);
 }
@@ -229,7 +231,11 @@ async function handleStrictPaidCommand(
   if (!invoice) return { kind: "strict_command_rejected", reason: "invoice_not_found" };
   if (invoice.client_id !== client.id)
     return { kind: "strict_command_rejected", reason: "invoice_not_owned" };
-  if (invoice.is_deleted || invoice.payment_status === "Done") {
+  if (
+    invoice.is_deleted ||
+    invoice.payment_status === "Done" ||
+    invoice.receiving_status === "awaiting_receiving"
+  ) {
     return { kind: "strict_command_rejected", reason: "invoice_not_open" };
   }
 
@@ -366,10 +372,13 @@ export class SupabaseInboundPaymentRepository implements InboundPaymentRepositor
   async findOpenInvoicesForClient(clientId: string): Promise<InboundInvoice[]> {
     const { data, error } = await this.supabase
       .from("invoices")
-      .select("id, client_id, invoice_no, amount, amount_received, payment_status, is_deleted")
+      .select(
+        "id, client_id, invoice_no, amount, amount_received, payment_status, receiving_status, is_deleted",
+      )
       .eq("client_id", clientId)
       .or("is_deleted.is.null,is_deleted.eq.false")
       .neq("payment_status", "Done")
+      .or("receiving_status.is.null,receiving_status.neq.awaiting_receiving")
       .order("due_date", { ascending: true, nullsFirst: false });
     if (error) throw new Error(`Open invoice lookup failed: ${error.message}`);
     return (data ?? []) as InboundInvoice[];
@@ -381,7 +390,9 @@ export class SupabaseInboundPaymentRepository implements InboundPaymentRepositor
   ): Promise<InboundInvoice | null> {
     const { data, error } = await this.supabase
       .from("invoices")
-      .select("id, client_id, invoice_no, amount, amount_received, payment_status, is_deleted")
+      .select(
+        "id, client_id, invoice_no, amount, amount_received, payment_status, receiving_status, is_deleted",
+      )
       .eq("client_id", clientId)
       .ilike("invoice_no", invoiceReference)
       .limit(1)

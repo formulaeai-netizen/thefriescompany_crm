@@ -30,7 +30,7 @@ export const listCreditPurchases = createServerFn({ method: "GET" })
     const { data, error } = await (context.supabase as any)
       .from("credit_inventory_purchases")
       .select(
-        "id, supplier_name, inventory_item_id, item_name_snapshot, quantity, unit, amount_due, purchased_at, due_at, status, payment_mode, notes, created_by, created_at, updated_at, paid_at, cancelled_at, cancellation_reason, reminder_lead_hours, reminder_queued_at, reminder_sent_at",
+        "id, supplier_name, inventory_item_id, item_name_snapshot, quantity, unit, amount_due, purchased_at, due_at, status, payment_mode, paid_from_account_id, notes, created_by, created_at, updated_at, paid_at, cancelled_at, cancellation_reason, reminder_lead_hours, reminder_queued_at, reminder_sent_at",
       )
       .order("due_at", { ascending: true });
     if (error) throw new Error(`Credit purchase list failed: ${error.message}`);
@@ -61,6 +61,7 @@ const createSchema = z.object({
   notes: z.string().trim().max(1000).nullable().optional(),
   reminder_lead_hours: z.number().int().positive().max(720).optional(),
   payment_mode: z.enum(["cash", "credit"]).optional(),
+  paid_from_account_id: z.string().uuid().nullable().optional(),
 });
 
 export const createCreditPurchase = createServerFn({ method: "POST" })
@@ -81,6 +82,7 @@ export const createCreditPurchase = createServerFn({ method: "POST" })
         _notes: data.notes ?? null,
         _reminder_lead_hours: data.reminder_lead_hours ?? 24,
         _payment_mode: data.payment_mode ?? "credit",
+        _paid_from_account_id: data.paid_from_account_id ?? null,
       },
     );
     if (error) throw new Error(`Credit purchase creation failed: ${error.message}`);
@@ -114,7 +116,10 @@ export const updateCreditPurchase = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const purchaseIdSchema = z.object({ purchase_id: z.string().uuid() });
+const purchaseIdSchema = z.object({
+  purchase_id: z.string().uuid(),
+  paid_from_account_id: z.string().uuid().optional(),
+});
 
 export const markCreditPurchasePaid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -123,6 +128,7 @@ export const markCreditPurchasePaid = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { error } = await (context.supabase as any).rpc("mark_credit_inventory_purchase_paid", {
       _purchase_id: data.purchase_id,
+      _paid_from_account_id: data.paid_from_account_id,
     });
     if (error) throw new Error(`Marking credit purchase paid failed: ${error.message}`);
     return { ok: true };

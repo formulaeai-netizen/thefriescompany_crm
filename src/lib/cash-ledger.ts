@@ -19,7 +19,8 @@ export type CashLedgerEntryType =
   | "expense"
   | "inventory_purchase"
   | "salary_payment"
-  | "salary_advance";
+  | "salary_advance"
+  | "account_transfer";
 
 export type CashLedgerDirection = "credit" | "debit";
 
@@ -56,13 +57,17 @@ export function insertLedgerEntry(
  * direction, so a flat SUM(amount) is correct for them. 'expense' is the
  * one type that (after the hardening pass) can contain a mix of debit
  * (original charge / upward correction) and credit (downward correction /
- * void) rows for the same underlying expense, so it must be netted by
- * direction instead - using a flat sum there would double-count a void.
+ * void) rows for the same underlying expense. Account transfers can be
+ * either direction for a given account. Both must be netted by direction
+ * instead - using a flat sum there would double-count a void or transfer.
  */
 export function sumLedgerByType(ledger: CashLedgerEntry[], type: CashLedgerEntryType): number {
   const entries = ledger.filter((e) => e.entry_type === type);
   if (type === "expense") {
     return entries.reduce((sum, e) => sum + (e.direction === "debit" ? e.amount : -e.amount), 0);
+  }
+  if (type === "account_transfer") {
+    return entries.reduce((sum, e) => sum + (e.direction === "credit" ? e.amount : -e.amount), 0);
   }
   return entries.reduce((sum, e) => sum + e.amount, 0);
 }

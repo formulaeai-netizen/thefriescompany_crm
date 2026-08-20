@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { fetchExpenses } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 import { pkr, fmtDate } from "@/lib/format";
@@ -7,7 +8,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FinancialAccountSelect } from "@/components/financial-account-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +26,8 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EXPENSE_GROUPS, GROUP_NAMES, type ExpenseGroup } from "@/lib/expense-categories";
 import { useIsAdmin } from "@/lib/roles";
+import { createExpense, deleteExpense, updateExpense } from "@/lib/expenses.functions";
+import { listFinancialAccounts } from "@/lib/financial-accounts.functions";
 import {
   Dialog,
   DialogContent,
@@ -52,11 +62,20 @@ function ExpensesPage() {
   const qc = useQueryClient();
   const { isAdmin } = useIsAdmin();
   const { data: expenses = [] } = useQuery({ queryKey: ["expenses"], queryFn: fetchExpenses });
+  const accountsFn = useServerFn(listFinancialAccounts);
+  const createExpenseFn = useServerFn(createExpense);
+  const deleteExpenseFn = useServerFn(deleteExpense);
+  const { data: accountData } = useQuery({
+    queryKey: ["financial-accounts"],
+    queryFn: () => accountsFn({}),
+    enabled: isAdmin,
+  });
   const [item, setItem] = useState("");
   const [price, setPrice] = useState("");
   const [group, setGroup] = useState<ExpenseGroup>("Variable Costs");
   const [subcategory, setSubcategory] = useState<string>(EXPENSE_GROUPS["Variable Costs"][0]);
   const [date, setDate] = useState<Date>(new Date());
+  const [paidFromAccountId, setPaidFromAccountId] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
@@ -77,7 +96,8 @@ function ExpensesPage() {
   const searchResults = useMemo(() => {
     if (!searchQ) return [];
     return (expenses as any[]).filter((e) => {
-      const hay = `${e.item ?? ""} ${e.category ?? ""} ${e.subcategory ?? ""} ${e.added_by_name ?? e.added_by ?? ""}`.toLowerCase();
+      const hay =
+        `${e.item ?? ""} ${e.category ?? ""} ${e.subcategory ?? ""} ${e.added_by_name ?? e.added_by ?? ""}`.toLowerCase();
       return hay.includes(searchQ);
     });
   }, [expenses, searchQ]);
@@ -97,11 +117,15 @@ function ExpensesPage() {
       const cy = now.getFullYear();
       const cm = now.getMonth() + 1;
       const filled = new Set<string>();
-      let y = sy, m = sm;
+      let y = sy,
+        m = sm;
       while (y < cy || (y === cy && m <= cm)) {
         filled.add(`${y}-${String(m).padStart(2, "0")}`);
         m++;
-        if (m > 12) { m = 1; y++; }
+        if (m > 12) {
+          m = 1;
+          y++;
+        }
       }
       return Array.from(filled).sort((a, b) => (a < b ? 1 : -1));
     }
@@ -145,6 +169,7 @@ function ExpensesPage() {
 
   const add = async () => {
     if (!item || !price) return toast.error("Item and price required");
+    if (!paidFromAccountId) return toast.error("Paid From account is required");
     const { data: userRes } = await supabase.auth.getUser();
     const uid = userRes.user?.id;
     if (!uid) return toast.error("Not signed in");
@@ -159,40 +184,60 @@ function ExpensesPage() {
       (prof as any)?.email ||
       userRes.user?.email ||
       "";
-    const { error } = await supabase.from("expenses").insert({
-      item, price: Number(price), category: group as any, subcategory: subcategory as any,
-      added_by: addedByName, created_by: uid,
-      date: format(date, "yyyy-MM-dd"),
-    } as any);
-    if (error) return toast.error(error.message);
+    try {
+      await createExpenseFn({
+        data: {
+          item,
+          price: Number(price),
+          category: group,
+          subcategory,
+          added_by: addedByName,
+          date: format(date, "yyyy-MM-dd"),
+          paid_from_account_id: paidFromAccountId,
+        },
+      });
+    } catch (error: any) {
+      return toast.error(error?.message ?? "Expense creation failed");
+    }
     toast.success("Expense added");
-    setItem(""); setPrice("");
+    setItem("");
+    setPrice("");
     qc.invalidateQueries({ queryKey: ["expenses"] });
+    qc.invalidateQueries({ queryKey: ["financial-account-balances"] });
   };
 
   const del = async (id: string) => {
-    const { error } = await supabase.from("expenses").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    try {
+      await deleteExpenseFn({ data: { expense_id: id } });
+    } catch (error: any) {
+      return toast.error(error?.message ?? "Expense delete failed");
+    }
     toast.success("Expense deleted");
     qc.invalidateQueries({ queryKey: ["expenses"] });
+    qc.invalidateQueries({ queryKey: ["financial-account-balances"] });
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Expenses</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Today's spend is included in the 8 PM daily group report.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Today's spend is included in the 8 PM daily group report.
+        </p>
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-5 md:grid-cols-[1.1fr_1.6fr_0.9fr_1fr_1fr_auto]">
+        <CardContent className="grid gap-3 p-5 md:grid-cols-[1.1fr_1.6fr_0.9fr_1fr_1fr_1fr_auto]">
           <div>
             <Label>Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground",
+                  )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {date ? format(date, "PPP") : <span>Pick a date</span>}
@@ -211,7 +256,11 @@ function ExpensesPage() {
           </div>
           <div>
             <Label>Item</Label>
-            <Input value={item} onChange={(e) => setItem(e.target.value)} placeholder="e.g. Maida" />
+            <Input
+              value={item}
+              onChange={(e) => setItem(e.target.value)}
+              placeholder="e.g. Maida"
+            />
           </div>
           <div>
             <Label>Price (Rs.)</Label>
@@ -227,10 +276,14 @@ function ExpensesPage() {
                 setSubcategory(EXPENSE_GROUPS[g][0]);
               }}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {GROUP_NAMES.map((g) => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -238,15 +291,32 @@ function ExpensesPage() {
           <div>
             <Label>Subcategory</Label>
             <Select value={subcategory} onValueChange={setSubcategory}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {EXPENSE_GROUPS[group].map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end"><Button onClick={add} className="w-full">Add</Button></div>
+          <div>
+            <Label>Paid From</Label>
+            <FinancialAccountSelect
+              accounts={accountData?.rows ?? []}
+              value={paidFromAccountId}
+              onValueChange={setPaidFromAccountId}
+              placeholder="Cash or Bank"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button data-financial-action onClick={add} className="w-full">
+              Add
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -272,12 +342,18 @@ function ExpensesPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Label htmlFor="month-filter" className="text-sm font-medium text-muted-foreground">Month</Label>
+          <Label htmlFor="month-filter" className="text-sm font-medium text-muted-foreground">
+            Month
+          </Label>
           <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger id="month-filter" className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="month-filter" className="h-9 w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {monthOptions.map((k) => (
-                <SelectItem key={k} value={k}>{monthLabel(k)}</SelectItem>
+                <SelectItem key={k} value={k}>
+                  {monthLabel(k)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -315,16 +391,25 @@ function ExpensesPage() {
       </div>
 
       {expenses.length === 0 && (
-        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">No expenses yet.</CardContent></Card>
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            No expenses yet.
+          </CardContent>
+        </Card>
       )}
 
       {searchQ ? (
         <section className="space-y-3">
           <div className="rounded-xl border border-border/60 bg-card px-4 py-3 text-sm text-muted-foreground">
-            Showing <strong className="text-primary">{searchResults.length}</strong> results for "{search}"
+            Showing <strong className="text-primary">{searchResults.length}</strong> results for "
+            {search}"
           </div>
           {searchResults.length === 0 ? (
-            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No matches.</CardContent></Card>
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                No matches.
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {searchResults.map((e: any) => (
@@ -336,10 +421,24 @@ function ExpensesPage() {
                     <span className="text-xs font-medium text-foreground">{fmtDate(e.date)}</span>
                     {isAdmin && (
                       <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit" onClick={() => setEditing(e)}>
+                        <Button
+                          data-financial-action
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          title="Edit"
+                          onClick={() => setEditing(e)}
+                        >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-foreground/70 hover:bg-muted" title="Delete" onClick={() => del(e.id)}>
+                        <Button
+                          data-financial-action
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-foreground/70 hover:bg-muted"
+                          title="Delete"
+                          onClick={() => del(e.id)}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -347,11 +446,20 @@ function ExpensesPage() {
                   </div>
                   <div className="text-lg font-bold leading-tight">{e.item}</div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className={cn("border", GROUP_BADGE_CLASS[e.category as ExpenseGroup] ?? "")}>{e.category}</Badge>
-                    {e.subcategory && <span className="text-xs text-muted-foreground">{e.subcategory}</span>}
+                    <Badge
+                      variant="outline"
+                      className={cn("border", GROUP_BADGE_CLASS[e.category as ExpenseGroup] ?? "")}
+                    >
+                      {e.category}
+                    </Badge>
+                    {e.subcategory && (
+                      <span className="text-xs text-muted-foreground">{e.subcategory}</span>
+                    )}
                   </div>
-                  <div className="tabular text-2xl font-bold text-foreground">{pkr(Number(e.price))}</div>
-                   <div className="mt-auto border-t border-border/40 pt-2 text-xs text-muted-foreground">
+                  <div className="tabular text-2xl font-bold text-foreground">
+                    {pkr(Number(e.price))}
+                  </div>
+                  <div className="mt-auto border-t border-border/40 pt-2 text-xs text-muted-foreground">
                     Added by {e.added_by_name ?? e.added_by ?? "—"}
                   </div>
                 </div>
@@ -359,79 +467,114 @@ function ExpensesPage() {
             </div>
           )}
         </section>
-      ) : grouped.map((section) => {
-        const isOpen = !collapsed[section.key];
-        return (
-          <section key={section.key} className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setCollapsed((c) => ({ ...c, [section.key]: isOpen }))}
-              className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3 text-left transition-colors hover:border-primary/30"
-            >
-              <div className="flex items-center gap-2">
-                {isOpen ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-primary" />}
-                <span className="text-base font-semibold">{section.label}</span>
-                <span className="text-xs text-muted-foreground">({section.items.length})</span>
-              </div>
-              <span className="tabular text-sm font-semibold text-primary">{pkr(section.total)}</span>
-            </button>
+      ) : (
+        grouped.map((section) => {
+          const isOpen = !collapsed[section.key];
+          return (
+            <section key={section.key} className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setCollapsed((c) => ({ ...c, [section.key]: isOpen }))}
+                className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3 text-left transition-colors hover:border-primary/30"
+              >
+                <div className="flex items-center gap-2">
+                  {isOpen ? (
+                    <ChevronDown className="h-4 w-4 text-primary" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-primary" />
+                  )}
+                  <span className="text-base font-semibold">{section.label}</span>
+                  <span className="text-xs text-muted-foreground">({section.items.length})</span>
+                </div>
+                <span className="tabular text-sm font-semibold text-primary">
+                  {pkr(section.total)}
+                </span>
+              </button>
 
-            {isOpen && (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {section.items.map((e: any) => (
-                  <div
-                    key={e.id}
-                    className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-4 transition-colors hover:border-primary/30"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-medium text-foreground">{fmtDate(e.date)}</span>
-                      {isAdmin && (
-                        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit" onClick={() => setEditing(e)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-foreground/70 hover:bg-muted" title="Delete">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete this expense?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Delete {e.item} — {pkr(Number(e.price))} on {fmtDate(e.date)}? This cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => del(e.id)}
+              {isOpen && (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {section.items.map((e: any) => (
+                    <div
+                      key={e.id}
+                      className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-4 transition-colors hover:border-primary/30"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-medium text-foreground">
+                          {fmtDate(e.date)}
+                        </span>
+                        {isAdmin && (
+                          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              title="Edit"
+                              onClick={() => setEditing(e)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-foreground/70 hover:bg-muted"
+                                  title="Delete"
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      )}
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete this expense?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Delete {e.item} — {pkr(Number(e.price))} on {fmtDate(e.date)}?
+                                    This cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    data-financial-action
+                                    onClick={() => del(e.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-lg font-bold leading-tight">{e.item}</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "border",
+                            GROUP_BADGE_CLASS[e.category as ExpenseGroup] ?? "",
+                          )}
+                        >
+                          {e.category}
+                        </Badge>
+                        {e.subcategory && (
+                          <span className="text-xs text-muted-foreground">{e.subcategory}</span>
+                        )}
+                      </div>
+                      <div className="tabular text-2xl font-bold text-foreground">
+                        {pkr(Number(e.price))}
+                      </div>
+                      <div className="mt-auto border-t border-border/40 pt-2 text-xs text-muted-foreground">
+                        Added by {e.added_by_name ?? e.added_by ?? "—"}
+                      </div>
                     </div>
-                    <div className="text-lg font-bold leading-tight">{e.item}</div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className={cn("border", GROUP_BADGE_CLASS[e.category as ExpenseGroup] ?? "")}>{e.category}</Badge>
-                      {e.subcategory && <span className="text-xs text-muted-foreground">{e.subcategory}</span>}
-                    </div>
-                    <div className="tabular text-2xl font-bold text-foreground">{pkr(Number(e.price))}</div>
-                     <div className="mt-auto border-t border-border/40 pt-2 text-xs text-muted-foreground">
-                      Added by {e.added_by_name ?? e.added_by ?? "—"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      })}
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })
+      )}
 
       {isAdmin && (
         <EditExpenseDialog
@@ -440,6 +583,7 @@ function ExpensesPage() {
           onSaved={() => {
             setEditing(null);
             qc.invalidateQueries({ queryKey: ["expenses"] });
+            qc.invalidateQueries({ queryKey: ["financial-account-balances"] });
           }}
         />
       )}
@@ -464,13 +608,16 @@ function EditExpenseDialog({
   const [date, setDate] = useState<Date>(new Date());
   const [addedBy, setAddedBy] = useState("");
   const [saving, setSaving] = useState(false);
+  const updateExpenseFn = useServerFn(updateExpense);
 
   // Reset fields whenever a new expense opens
   useEffect(() => {
     if (expense) {
       setItem(expense.item ?? "");
       setPrice(String(expense.price ?? ""));
-      const g = (GROUP_NAMES as readonly string[]).includes(expense.category) ? (expense.category as ExpenseGroup) : "Variable Costs";
+      const g = (GROUP_NAMES as readonly string[]).includes(expense.category)
+        ? (expense.category as ExpenseGroup)
+        : "Variable Costs";
       setGroup(g);
       setSubcategory(expense.subcategory ?? EXPENSE_GROUPS[g][0]);
       setDate(expense.date ? new Date(expense.date) : new Date());
@@ -482,19 +629,24 @@ function EditExpenseDialog({
     if (!expense) return;
     if (!item || !price) return toast.error("Item and price required");
     setSaving(true);
-    const { error } = await supabase
-      .from("expenses")
-      .update({
-        item,
-        price: Number(price),
-        category: group as any,
-        subcategory: subcategory as any,
-        added_by: addedBy,
-        date: format(date, "yyyy-MM-dd"),
-      } as any)
-      .eq("id", expense.id);
+    let caught: any = null;
+    try {
+      await updateExpenseFn({
+        data: {
+          expense_id: expense.id,
+          item,
+          price: Number(price),
+          category: group,
+          subcategory,
+          added_by: addedBy,
+          date: format(date, "yyyy-MM-dd"),
+        },
+      });
+    } catch (error: any) {
+      caught = error;
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (caught) return toast.error(caught?.message ?? "Expense update failed");
     toast.success("Expense updated");
     onSaved();
   };
@@ -516,7 +668,13 @@ function EditExpenseDialog({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => d && setDate(d)}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -527,19 +685,38 @@ function EditExpenseDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Group</Label>
-              <Select value={group} onValueChange={(v) => { const g = v as ExpenseGroup; setGroup(g); setSubcategory(EXPENSE_GROUPS[g][0]); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={group}
+                onValueChange={(v) => {
+                  const g = v as ExpenseGroup;
+                  setGroup(g);
+                  setSubcategory(EXPENSE_GROUPS[g][0]);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {GROUP_NAMES.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+                  {GROUP_NAMES.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Subcategory</Label>
               <Select value={subcategory} onValueChange={setSubcategory}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {EXPENSE_GROUPS[group].map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                  {EXPENSE_GROUPS[group].map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -556,8 +733,10 @@ function EditExpenseDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button data-financial-action onClick={save} disabled={saving}>
             {saving ? "Saving…" : "Save Changes"}
           </Button>
         </DialogFooter>

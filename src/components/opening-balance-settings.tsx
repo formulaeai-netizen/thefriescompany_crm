@@ -130,7 +130,9 @@ export function OpeningBalanceSettings() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => mut.mutate()}>Confirm</AlertDialogAction>
+              <AlertDialogAction data-financial-action onClick={() => mut.mutate()}>
+                Confirm
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

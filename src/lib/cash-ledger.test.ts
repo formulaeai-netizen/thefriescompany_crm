@@ -20,6 +20,7 @@ function summaryFor(ledger: CashLedgerEntry[], openingBalance = 0) {
     inventoryPurchasesPaidTotal: sumLedgerByType(ledger, "inventory_purchase"),
     paidSalariesTotal: sumLedgerByType(ledger, "salary_payment"),
     salaryAdvancesPaidTotal: sumLedgerByType(ledger, "salary_advance"),
+    accountTransfersTotal: sumLedgerByType(ledger, "account_transfer"),
     adjustmentsTotal: sumAdjustments(ledger),
   };
 }

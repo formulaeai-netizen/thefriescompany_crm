@@ -33,6 +33,7 @@ export const getCashInHandSummary = createServerFn({ method: "GET" })
       inventory_purchases_paid_total: Number(row?.inventory_purchases_paid_total ?? 0),
       paid_salaries_total: Number(row?.paid_salaries_total ?? 0),
       salary_advances_paid_total: Number(row?.salary_advances_paid_total ?? 0),
+      account_transfers_total: Number(row?.account_transfers_total ?? 0),
       adjustments_total: Number(row?.adjustments_total ?? 0),
       cash_in_hand: Number(row?.cash_in_hand ?? 0),
     };

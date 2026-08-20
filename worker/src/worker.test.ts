@@ -5,7 +5,11 @@ import { loadWorkerConfig } from "./config.js";
 import { MetaCloudProvider } from "./providers/meta-cloud.provider.js";
 import { assertRealSendAllowed, type WhatsAppProvider } from "./providers/whatsapp-provider.js";
 import { WhatsAppWebProvider } from "./providers/whatsapp-web.provider.js";
-import { startQueueProcessor } from "./services/queue-processor.js";
+import {
+  buildEligibleReminderRows,
+  calculateOutstandingAmount,
+  startQueueProcessor,
+} from "./services/queue-processor.js";
 
 function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => T): T {
   const previous = { ...process.env };
@@ -101,6 +105,11 @@ test("queue processing does not start automatically", async () => {
     automationEnabled: false,
     dryRun: true,
     allowRealSend: false,
+    webPushEnabled: false,
+    webPushDryRun: true,
+    webPushVapidPublicKey: null,
+    webPushVapidPrivateKey: null,
+    webPushSubject: null,
     messageDelayMs: 0,
     maxSendRetries: 2,
     sessionPath: ".worker-data/whatsapp-session",
@@ -109,6 +118,62 @@ test("queue processing does not start automatically", async () => {
   assert.equal(report.reason, "env_automation_disabled");
   assert.equal(report.scanCount, 0);
   assert.equal(report.sentCount, 0);
+});
+
+test("awaiting-receiving invoices are excluded from worker reminder scans", () => {
+  assert.equal(
+    calculateOutstandingAmount({
+      amount: 1000,
+      amount_received: 0,
+      payment_status: "Not Done",
+      receiving_status: "awaiting_receiving",
+    }),
+    0,
+  );
+
+  const result = buildEligibleReminderRows(
+    [
+      {
+        id: "invoice-1",
+        invoice_no: "TFC-1",
+        client_id: "client-1",
+        date: "2026-08-01",
+        delivery_date: "2026-08-01",
+        due_date: "2026-08-05",
+        amount: 1000,
+        amount_received: 0,
+        payment_status: "Not Done",
+        receiving_status: "awaiting_receiving",
+        is_deleted: false,
+        clients: {
+          id: "client-1",
+          legal_name: "Test Client",
+          phone: "03001234567",
+          phone_normalized: null,
+          whatsapp_opt_out: false,
+          reminders_paused: false,
+        },
+      },
+    ],
+    [],
+    {
+      enabled: true,
+      dry_run: false,
+      manual_approval_required: true,
+      pause_all: false,
+      provider: "whatsapp-web",
+      automation_launch_date: "2026-08-01",
+      timezone: "Asia/Karachi",
+      first_reminder_after_days: 1,
+      repeat_interval_days: 3,
+      maximum_reminders: 4,
+      maximum_daily_messages: 20,
+    },
+    new Date("2026-08-10T00:00:00.000Z"),
+  );
+
+  assert.equal(result.rows.length, 0);
+  assert.equal(result.skippedCount, 1);
 });
 
 class FakeWhatsAppClient extends EventEmitter {
@@ -127,7 +192,7 @@ class FakeWhatsAppClient extends EventEmitter {
   }
 }
 
-function createReadyWebProvider(client: FakeWhatsAppClient, timeoutMs = 50) {
+function createReadyWebProvider(client: FakeWhatsAppClient, timeoutMs = 500) {
   const provider = new WhatsAppWebProvider({
     sessionPath: ".worker-data/test-session",
     allowRealSend: true,

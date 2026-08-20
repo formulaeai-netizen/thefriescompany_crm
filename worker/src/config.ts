@@ -10,6 +10,11 @@ export type WorkerConfig = {
   automationEnabled: boolean;
   dryRun: boolean;
   allowRealSend: boolean;
+  webPushEnabled: boolean;
+  webPushDryRun: boolean;
+  webPushVapidPublicKey: string | null;
+  webPushVapidPrivateKey: string | null;
+  webPushSubject: string | null;
   sessionPath: string;
   messageDelayMs: number;
   maxSendRetries: number;
@@ -54,6 +59,11 @@ export function loadWorkerConfig(): WorkerConfig {
     automationEnabled: readBoolean("WHATSAPP_AUTOMATION_ENABLED", false),
     dryRun: readBoolean("WHATSAPP_DRY_RUN", true),
     allowRealSend: readBoolean("WHATSAPP_ALLOW_REAL_SEND", false),
+    webPushEnabled: readBoolean("WEB_PUSH_ENABLED", false),
+    webPushDryRun: readBoolean("WEB_PUSH_DRY_RUN", true),
+    webPushVapidPublicKey: process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim() || null,
+    webPushVapidPrivateKey: process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim() || null,
+    webPushSubject: process.env.WEB_PUSH_SUBJECT?.trim() || null,
     sessionPath: path.resolve(process.cwd(), sessionPath),
     messageDelayMs: readNonNegativeInteger("WHATSAPP_MESSAGE_DELAY_MS", 5000),
     maxSendRetries: readNonNegativeInteger("WHATSAPP_MAX_SEND_RETRIES", 2),
@@ -68,6 +78,11 @@ export function safeConfigSummary(config: WorkerConfig) {
     automationEnabled: config.automationEnabled,
     dryRun: config.dryRun,
     allowRealSend: config.allowRealSend,
+    webPushEnabled: config.webPushEnabled,
+    webPushDryRun: config.webPushDryRun,
+    webPushVapidConfigured: Boolean(
+      config.webPushVapidPublicKey && config.webPushVapidPrivateKey && config.webPushSubject,
+    ),
     sessionPath: config.sessionPath,
     messageDelayMs: config.messageDelayMs,
     maxSendRetries: config.maxSendRetries,

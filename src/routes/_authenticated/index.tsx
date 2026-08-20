@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { pkr } from "@/lib/format";
 import { getCashInHandSummary } from "@/lib/cash-in-hand.functions";
 import { CashInHandRows } from "@/components/cash-in-hand-breakdown-card";
+import { OwnerBusinessHealthCard } from "@/components/owner-business-health-card";
+import { BusinessWatchdogCard } from "@/components/business-watchdog-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -799,6 +801,11 @@ function Index() {
                   </Card>
                 );
               })}
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+            <OwnerBusinessHealthCard />
+            <BusinessWatchdogCard />
           </div>
 
           <Card>

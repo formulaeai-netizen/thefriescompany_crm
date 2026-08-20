@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { FinancialAccountSelect } from "@/components/financial-account-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -54,6 +55,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Pencil, Plus, CheckCircle2, Lock, Undo2, Ban, Wallet } from "lucide-react";
+import { listFinancialAccounts } from "@/lib/financial-accounts.functions";
 
 export const Route = createFileRoute("/_authenticated/salaries")({
   head: () => ({ meta: [{ title: "Salaries — TFC CRM" }] }),
@@ -99,6 +101,7 @@ type PayrollRow = {
   paid: boolean;
   paid_at: string | null;
   paid_by: string | null;
+  paid_from_account_id: string | null;
   finalized_at: string | null;
   finalized_by: string | null;
   cancelled_at: string | null;
@@ -129,6 +132,7 @@ type SalaryAdvance = {
   amount: number;
   advance_date: string;
   notes: string | null;
+  paid_from_account_id: string | null;
   created_by: string | null;
   created_at: string;
   linked_total: number;
@@ -170,6 +174,7 @@ function SalariesPage() {
   const listPayrollFn = useServerFn(listPayroll);
   const listEmployeesFn = useServerFn(listEmployees);
   const listAdvancesFn = useServerFn(listSalaryAdvances);
+  const accountsFn = useServerFn(listFinancialAccounts);
 
   const payrollQ = useQuery({ queryKey: ["payroll"], queryFn: () => listPayrollFn({}) });
   const employeesQ = useQuery({
@@ -177,12 +182,18 @@ function SalariesPage() {
     queryFn: () => listEmployeesFn({}),
   });
   const advancesQ = useQuery({ queryKey: ["salary-advances"], queryFn: () => listAdvancesFn({}) });
+  const accountsQ = useQuery({
+    queryKey: ["financial-accounts"],
+    queryFn: () => accountsFn({}),
+    enabled: isAdmin,
+  });
 
-  const rows: PayrollRow[] = payrollQ.data?.rows ?? [];
+  const rows: PayrollRow[] = useMemo(() => payrollQ.data?.rows ?? [], [payrollQ.data?.rows]);
   const names: Record<string, string> = payrollQ.data?.names ?? {};
   const employees: Employee[] = employeesQ.data?.rows ?? [];
   const advances: SalaryAdvance[] = advancesQ.data?.rows ?? [];
   const advanceNames: Record<string, string> = advancesQ.data?.names ?? {};
+  const accounts = accountsQ.data?.rows ?? [];
 
   const [monthFilter, setMonthFilter] = useState<string>(currentMonthKey());
   const [payrollDialogOpen, setPayrollDialogOpen] = useState(false);
@@ -255,7 +266,8 @@ function SalariesPage() {
 
   const markPaidFn = useServerFn(markPayrollPaid);
   const markPaidMut = useMutation({
-    mutationFn: (payroll_id: string) => markPaidFn({ data: { payroll_id } }),
+    mutationFn: (input: { payroll_id: string; paid_from_account_id: string }) =>
+      markPaidFn({ data: input }),
     onSuccess: () => {
       toast.success("Payroll marked as paid");
       invalidateAll();
@@ -313,138 +325,238 @@ function SalariesPage() {
           </div>
 
           <Card className="bg-[#111827] border-white/5 overflow-hidden">
-            <CardContent className="p-0 overflow-x-auto">
-              <table className="min-w-full text-xs">
-                <thead>
-                  <tr className="bg-[#0A0F1E] text-amber-300/90 uppercase tracking-wider">
-                    <th className="p-2 text-left">Employee</th>
-                    <th className="p-2 text-left">Period</th>
-                    <th className="p-2 text-right">Base Salary</th>
-                    <th className="p-2 text-right">Overtime</th>
-                    <th className="p-2 text-right">Bonus/Extras</th>
-                    <th className="p-2 text-right">Deductions</th>
-                    <th className="p-2 text-right">Net Salary</th>
-                    <th className="p-2 text-center">Status</th>
-                    <th className="p-2 text-center">Paid Date</th>
-                    <th className="p-2 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="text-white/90">
-                  {monthRows.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="p-8 text-center text-muted-foreground">
-                        No payroll records for {monthLabel(monthFilter)}.
-                      </td>
+            <CardContent className="p-0">
+              <div className="desktop-table overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead>
+                    <tr className="bg-[#0A0F1E] text-amber-300/90 uppercase tracking-wider">
+                      <th className="p-2 text-left">Employee</th>
+                      <th className="p-2 text-left">Period</th>
+                      <th className="p-2 text-right">Base Salary</th>
+                      <th className="p-2 text-right">Overtime</th>
+                      <th className="p-2 text-right">Bonus/Extras</th>
+                      <th className="p-2 text-right">Deductions</th>
+                      <th className="p-2 text-right">Net Salary</th>
+                      <th className="p-2 text-center">Status</th>
+                      <th className="p-2 text-center">Paid Date</th>
+                      <th className="p-2 text-center">Actions</th>
                     </tr>
-                  )}
-                  {monthRows.map((r) => {
-                    const extras =
-                      n(r.bonus) + n(r.allowances) + n(r.commission) + n(r.other_earnings);
-                    const badge = STATUS_BADGE[r.status];
-                    return (
-                      <tr key={r.id} className="border-t border-white/5 hover:bg-white/[0.02]">
-                        <td className="p-2 font-medium">
-                          {r.employee_name}
-                          <div className="text-[10px] text-muted-foreground">{r.employee_id}</div>
-                        </td>
-                        <td className="p-2">{monthLabel(r.month)}</td>
-                        <td className="p-2 text-right">{pkr(r.base_earned)}</td>
-                        <td className="p-2 text-right">{pkr(r.overtime_amount)}</td>
-                        <td className="p-2 text-right">{pkr(extras)}</td>
-                        <td className="p-2 text-right text-red-300/90">
-                          {pkr(r.total_deductions)}
-                        </td>
-                        <td className="p-2 text-right font-semibold text-amber-300">
-                          {pkr(r.net_salary)}
-                        </td>
-                        <td className="p-2 text-center">
-                          <Badge variant="outline" className={badge.className}>
-                            {badge.label}
-                          </Badge>
-                        </td>
-                        <td className="p-2 text-center text-[10px] text-muted-foreground">
-                          {r.paid_at ? new Date(r.paid_at).toLocaleDateString() : "—"}
-                          {r.paid_by && names[r.paid_by] ? <div>by {names[r.paid_by]}</div> : null}
-                        </td>
-                        <td className="p-2">
-                          <div className="flex items-center justify-center gap-1 flex-wrap">
-                            {r.status === "draft" && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                title="Edit"
-                                onClick={() => openEdit(r)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            {r.status !== "draft" && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                title="View"
-                                onClick={() => openEdit(r)}
-                              >
-                                <Pencil className="h-3.5 w-3.5 opacity-60" />
-                              </Button>
-                            )}
-                            {isAdmin && r.status === "draft" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={finalizeMut.isPending}
-                                onClick={() => finalizeMut.mutate(r.id)}
-                                title="Finalize"
-                              >
-                                <Lock className="h-3.5 w-3.5 mr-1" /> Finalize
-                              </Button>
-                            )}
-                            {isAdmin && r.status === "finalized" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={revertMut.isPending}
-                                onClick={() => revertMut.mutate(r.id)}
-                                title="Revert to draft"
-                              >
-                                <Undo2 className="h-3.5 w-3.5 mr-1" /> Revert
-                              </Button>
-                            )}
-                            {isAdmin && r.status === "finalized" && (
-                              <MarkPaidButton
-                                row={r}
-                                pending={markPaidMut.isPending}
-                                onConfirm={() => markPaidMut.mutate(r.id)}
-                              />
-                            )}
-                            {isAdmin && (r.status === "draft" || r.status === "finalized") && (
-                              <CancelPayrollButton
-                                pending={cancelMut.isPending}
-                                onConfirm={(reason) =>
-                                  cancelMut.mutate({ payroll_id: r.id, reason })
-                                }
-                              />
-                            )}
-                          </div>
+                  </thead>
+                  <tbody className="text-white/90">
+                    {monthRows.length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="p-8 text-center text-muted-foreground">
+                          No payroll records for {monthLabel(monthFilter)}.
                         </td>
                       </tr>
-                    );
-                  })}
-                  {monthRows.length > 0 && (
-                    <tr className="border-t-2 border-amber-500/40 bg-[#0A0F1E]/60 font-semibold text-amber-200">
-                      <td className="p-2" colSpan={2}>
-                        TOTAL (excludes cancelled)
-                      </td>
-                      <td className="p-2 text-right">{pkr(totals.base)}</td>
-                      <td className="p-2 text-right">{pkr(totals.overtime)}</td>
-                      <td className="p-2 text-right">{pkr(totals.extras)}</td>
-                      <td className="p-2 text-right">{pkr(totals.deductions)}</td>
-                      <td className="p-2 text-right text-amber-300">{pkr(totals.net)}</td>
-                      <td colSpan={3} />
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                    {monthRows.map((r) => {
+                      const extras =
+                        n(r.bonus) + n(r.allowances) + n(r.commission) + n(r.other_earnings);
+                      const badge = STATUS_BADGE[r.status];
+                      return (
+                        <tr key={r.id} className="border-t border-white/5 hover:bg-white/[0.02]">
+                          <td className="p-2 font-medium">
+                            {r.employee_name}
+                            <div className="text-[10px] text-muted-foreground">{r.employee_id}</div>
+                          </td>
+                          <td className="p-2">{monthLabel(r.month)}</td>
+                          <td className="p-2 text-right">{pkr(r.base_earned)}</td>
+                          <td className="p-2 text-right">{pkr(r.overtime_amount)}</td>
+                          <td className="p-2 text-right">{pkr(extras)}</td>
+                          <td className="p-2 text-right text-red-300/90">
+                            {pkr(r.total_deductions)}
+                          </td>
+                          <td className="p-2 text-right font-semibold text-amber-300">
+                            {pkr(r.net_salary)}
+                          </td>
+                          <td className="p-2 text-center">
+                            <Badge variant="outline" className={badge.className}>
+                              {badge.label}
+                            </Badge>
+                          </td>
+                          <td className="p-2 text-center text-[10px] text-muted-foreground">
+                            {r.paid_at ? new Date(r.paid_at).toLocaleDateString() : "—"}
+                            {r.paid_by && names[r.paid_by] ? (
+                              <div>by {names[r.paid_by]}</div>
+                            ) : null}
+                          </td>
+                          <td className="p-2">
+                            <div className="flex items-center justify-center gap-1 flex-wrap">
+                              {r.status === "draft" && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  title="Edit"
+                                  onClick={() => openEdit(r)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {r.status !== "draft" && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  title="View"
+                                  onClick={() => openEdit(r)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5 opacity-60" />
+                                </Button>
+                              )}
+                              {isAdmin && r.status === "draft" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={finalizeMut.isPending}
+                                  onClick={() => finalizeMut.mutate(r.id)}
+                                  title="Finalize"
+                                >
+                                  <Lock className="h-3.5 w-3.5 mr-1" /> Finalize
+                                </Button>
+                              )}
+                              {isAdmin && r.status === "finalized" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={revertMut.isPending}
+                                  onClick={() => revertMut.mutate(r.id)}
+                                  title="Revert to draft"
+                                >
+                                  <Undo2 className="h-3.5 w-3.5 mr-1" /> Revert
+                                </Button>
+                              )}
+                              {isAdmin && r.status === "finalized" && (
+                                <MarkPaidButton
+                                  row={r}
+                                  accounts={accounts}
+                                  pending={markPaidMut.isPending}
+                                  onConfirm={(accountId) =>
+                                    markPaidMut.mutate({
+                                      payroll_id: r.id,
+                                      paid_from_account_id: accountId,
+                                    })
+                                  }
+                                />
+                              )}
+                              {isAdmin && (r.status === "draft" || r.status === "finalized") && (
+                                <CancelPayrollButton
+                                  pending={cancelMut.isPending}
+                                  onConfirm={(reason) =>
+                                    cancelMut.mutate({ payroll_id: r.id, reason })
+                                  }
+                                />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {monthRows.length > 0 && (
+                      <tr className="border-t-2 border-amber-500/40 bg-[#0A0F1E]/60 font-semibold text-amber-200">
+                        <td className="p-2" colSpan={2}>
+                          TOTAL (excludes cancelled)
+                        </td>
+                        <td className="p-2 text-right">{pkr(totals.base)}</td>
+                        <td className="p-2 text-right">{pkr(totals.overtime)}</td>
+                        <td className="p-2 text-right">{pkr(totals.extras)}</td>
+                        <td className="p-2 text-right">{pkr(totals.deductions)}</td>
+                        <td className="p-2 text-right text-amber-300">{pkr(totals.net)}</td>
+                        <td colSpan={3} />
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mobile-card-list">
+                {monthRows.length === 0 && (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    No payroll records for {monthLabel(monthFilter)}.
+                  </div>
+                )}
+                {monthRows.map((r) => {
+                  const extras =
+                    n(r.bonus) + n(r.allowances) + n(r.commission) + n(r.other_earnings);
+                  const badge = STATUS_BADGE[r.status];
+                  return (
+                    <div key={r.id} className="mobile-data-card space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">{r.employee_name}</div>
+                          <div className="text-xs text-muted-foreground">{monthLabel(r.month)}</div>
+                        </div>
+                        <Badge variant="outline" className={badge.className}>
+                          {badge.label}
+                        </Badge>
+                      </div>
+                      <div className="mobile-data-row">
+                        <span>Base Salary</span>
+                        <span>{pkr(r.base_earned)}</span>
+                      </div>
+                      <div className="mobile-data-row">
+                        <span>Overtime</span>
+                        <span>{pkr(r.overtime_amount)}</span>
+                      </div>
+                      <div className="mobile-data-row">
+                        <span>Bonus / Extras</span>
+                        <span>{pkr(extras)}</span>
+                      </div>
+                      <div className="mobile-data-row">
+                        <span>Deductions</span>
+                        <span className="text-destructive">{pkr(r.total_deductions)}</span>
+                      </div>
+                      <div className="mobile-data-row">
+                        <span>Net Salary</span>
+                        <span className="font-semibold text-primary">{pkr(r.net_salary)}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
+                          {r.status === "draft" ? "Edit" : "View"}
+                        </Button>
+                        {isAdmin && r.status === "draft" && (
+                          <Button
+                            data-financial-action
+                            size="sm"
+                            variant="outline"
+                            disabled={finalizeMut.isPending}
+                            onClick={() => finalizeMut.mutate(r.id)}
+                          >
+                            Finalize
+                          </Button>
+                        )}
+                        {isAdmin && r.status === "finalized" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={revertMut.isPending}
+                            onClick={() => revertMut.mutate(r.id)}
+                          >
+                            Revert
+                          </Button>
+                        )}
+                        {isAdmin && r.status === "finalized" && (
+                          <MarkPaidButton
+                            row={r}
+                            accounts={accounts}
+                            pending={markPaidMut.isPending}
+                            onConfirm={(accountId) =>
+                              markPaidMut.mutate({
+                                payroll_id: r.id,
+                                paid_from_account_id: accountId,
+                              })
+                            }
+                          />
+                        )}
+                        {isAdmin && (r.status === "draft" || r.status === "finalized") && (
+                          <CancelPayrollButton
+                            pending={cancelMut.isPending}
+                            onConfirm={(reason) => cancelMut.mutate({ payroll_id: r.id, reason })}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -454,6 +566,7 @@ function SalariesPage() {
             employees={employees}
             advances={advances}
             names={advanceNames}
+            accounts={accounts}
             isAdmin={isAdmin}
             onChanged={invalidateAll}
           />
@@ -488,17 +601,27 @@ function SalariesPage() {
 
 function MarkPaidButton({
   row,
+  accounts,
   pending,
   onConfirm,
 }: {
   row: PayrollRow;
+  accounts: Array<{ id: string; name: string; account_type: string }>;
   pending: boolean;
-  onConfirm: () => void;
+  onConfirm: (accountId: string) => void;
 }) {
+  const [accountId, setAccountId] = useState(row.paid_from_account_id ?? "");
+
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button size="sm" variant="outline" disabled={pending} title="Mark Paid">
+        <Button
+          data-financial-action
+          size="sm"
+          variant="outline"
+          disabled={pending}
+          title="Mark Paid"
+        >
           <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark Paid
         </Button>
       </AlertDialogTrigger>
@@ -521,19 +644,35 @@ function MarkPaidButton({
               </div>
               <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
                 <span className="text-muted-foreground">
-                  Amount that will be deducted from Cash in Hand:{" "}
+                  Amount that will be deducted from the selected account:{" "}
                 </span>
                 <span className="font-semibold text-amber-300">{pkr(row.net_salary)}</span>
               </div>
+              <div>
+                <span className="mb-1 block text-xs text-muted-foreground">Paid From</span>
+                <FinancialAccountSelect
+                  accounts={accounts}
+                  value={accountId}
+                  onValueChange={setAccountId}
+                  placeholder="Cash or Bank"
+                  disabled={pending}
+                />
+              </div>
               <div className="text-xs text-muted-foreground">
-                This creates exactly one cash debit and cannot be undone from here.
+                This creates exactly one selected-account debit and cannot be undone from here.
               </div>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Mark Paid</AlertDialogAction>
+          <AlertDialogAction
+            data-financial-action
+            disabled={!accountId || pending}
+            onClick={() => onConfirm(accountId)}
+          >
+            Mark Paid
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -813,7 +952,7 @@ function PayrollDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label className="text-xs">Employee</Label>
             <Select
@@ -947,7 +1086,7 @@ function PayrollDialog({
             onChange={(v) => setForm((f) => ({ ...f, other_deduction: v }))}
             disabled={isReadOnly}
           />
-          <div className="col-span-2 grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
             <Field
               label="Manual Adjustment (+/-)"
               type="number"
@@ -962,7 +1101,7 @@ function PayrollDialog({
               disabled={isReadOnly}
             />
           </div>
-          <div className="col-span-2 space-y-1">
+          <div className="space-y-1 sm:col-span-2">
             <Label className="text-xs">Notes</Label>
             <Textarea
               value={form.notes}
@@ -1100,12 +1239,14 @@ function AdvancesTab({
   employees,
   advances,
   names,
+  accounts,
   isAdmin,
   onChanged,
 }: {
   employees: Employee[];
   advances: SalaryAdvance[];
   names: Record<string, string>;
+  accounts: Array<{ id: string; name: string; account_type: string }>;
   isAdmin: boolean;
   onChanged: () => void;
 }) {
@@ -1114,16 +1255,18 @@ function AdvancesTab({
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [paidFromAccountId, setPaidFromAccountId] = useState("");
 
   const createFn = useServerFn(createSalaryAdvance);
   const createMut = useMutation({
     mutationFn: (data: any) => createFn({ data }),
     onSuccess: () => {
-      toast.success("Salary advance recorded and debited from Cash in Hand");
+      toast.success("Salary advance recorded and debited from selected account");
       setOpen(false);
       setEmployeeId("");
       setAmount("");
       setNotes("");
+      setPaidFromAccountId("");
       onChanged();
     },
     onError: (e: any) => toast.error(e?.message ?? "Could not record salary advance"),
@@ -1137,8 +1280,9 @@ function AdvancesTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          A salary advance is cash physically given to an employee now - it debits Cash in Hand
-          immediately. Deducting it later from a payslip never debits Cash in Hand a second time.
+          A salary advance is money physically given to an employee now - it debits the selected
+          account immediately. Deducting it later from a payslip never debits cash/bank a second
+          time.
         </p>
         {isAdmin && (
           <Dialog open={open} onOpenChange={setOpen}>
@@ -1163,6 +1307,16 @@ function AdvancesTab({
                   </Select>
                 </div>
                 <Field label="Amount" type="number" value={amount} onChange={setAmount} />
+                <div className="space-y-1">
+                  <Label className="text-xs">Paid From</Label>
+                  <FinancialAccountSelect
+                    accounts={accounts}
+                    value={paidFromAccountId}
+                    onValueChange={setPaidFromAccountId}
+                    placeholder="Cash or Bank"
+                    disabled={createMut.isPending}
+                  />
+                </div>
                 <Field label="Date" type="date" value={date} onChange={setDate} />
                 <div className="space-y-1">
                   <Label className="text-xs">Notes (optional)</Label>
@@ -1174,14 +1328,16 @@ function AdvancesTab({
                   Cancel
                 </Button>
                 <Button
+                  data-financial-action
                   className="bg-amber-500 hover:bg-amber-600 text-black"
-                  disabled={createMut.isPending}
+                  disabled={createMut.isPending || !paidFromAccountId}
                   onClick={() =>
                     createMut.mutate({
                       employee_ref_id: employeeId,
                       amount: n(amount),
                       advance_date: date,
                       notes: notes.trim() || null,
+                      paid_from_account_id: paidFromAccountId,
                     })
                   }
                 >
@@ -1190,6 +1346,7 @@ function AdvancesTab({
               </DialogFooter>
             </DialogContent>
             <Button
+              data-financial-action
               onClick={() => setOpen(true)}
               className="bg-amber-500 hover:bg-amber-600 text-black font-medium"
             >
@@ -1200,46 +1357,83 @@ function AdvancesTab({
       </div>
 
       <Card className="bg-[#111827] border-white/5 overflow-hidden">
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="min-w-full text-xs">
-            <thead>
-              <tr className="bg-[#0A0F1E] text-amber-300/90 uppercase tracking-wider">
-                <th className="p-2 text-left">Employee</th>
-                <th className="p-2 text-left">Date</th>
-                <th className="p-2 text-right">Amount</th>
-                <th className="p-2 text-right">Deducted So Far</th>
-                <th className="p-2 text-right">Outstanding</th>
-                <th className="p-2 text-left">Notes</th>
-                <th className="p-2 text-left">Given By</th>
-              </tr>
-            </thead>
-            <tbody className="text-white/90">
-              {advances.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                    No salary advances recorded.
-                  </td>
+        <CardContent className="p-0">
+          <div className="desktop-table overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="bg-[#0A0F1E] text-amber-300/90 uppercase tracking-wider">
+                  <th className="p-2 text-left">Employee</th>
+                  <th className="p-2 text-left">Date</th>
+                  <th className="p-2 text-right">Amount</th>
+                  <th className="p-2 text-right">Deducted So Far</th>
+                  <th className="p-2 text-right">Outstanding</th>
+                  <th className="p-2 text-left">Notes</th>
+                  <th className="p-2 text-left">Given By</th>
                 </tr>
-              )}
-              {advances.map((a) => (
-                <tr key={a.id} className="border-t border-white/5">
-                  <td className="p-2 font-medium">{employeeName(a.employee_ref_id)}</td>
-                  <td className="p-2">{new Date(a.advance_date).toLocaleDateString()}</td>
-                  <td className="p-2 text-right">{pkr(a.amount)}</td>
-                  <td className="p-2 text-right">{pkr(a.linked_total)}</td>
-                  <td
-                    className={`p-2 text-right font-semibold ${a.outstanding > 0 ? "text-amber-300" : "text-success"}`}
-                  >
+              </thead>
+              <tbody className="text-white/90">
+                {advances.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                      No salary advances recorded.
+                    </td>
+                  </tr>
+                )}
+                {advances.map((a) => (
+                  <tr key={a.id} className="border-t border-white/5">
+                    <td className="p-2 font-medium">{employeeName(a.employee_ref_id)}</td>
+                    <td className="p-2">{new Date(a.advance_date).toLocaleDateString()}</td>
+                    <td className="p-2 text-right">{pkr(a.amount)}</td>
+                    <td className="p-2 text-right">{pkr(a.linked_total)}</td>
+                    <td
+                      className={`p-2 text-right font-semibold ${a.outstanding > 0 ? "text-amber-300" : "text-success"}`}
+                    >
+                      {pkr(a.outstanding)}
+                    </td>
+                    <td className="p-2 text-white/70">{a.notes ?? "—"}</td>
+                    <td className="p-2 text-white/70">
+                      {a.created_by ? (names[a.created_by] ?? "—") : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mobile-card-list">
+            {advances.length === 0 && (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No salary advances recorded.
+              </div>
+            )}
+            {advances.map((a) => (
+              <div key={a.id} className="mobile-data-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold">{employeeName(a.employee_ref_id)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(a.advance_date).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="tabular font-semibold text-primary">{pkr(a.amount)}</div>
+                </div>
+                <div className="mobile-data-row">
+                  <span>Deducted So Far</span>
+                  <span>{pkr(a.linked_total)}</span>
+                </div>
+                <div className="mobile-data-row">
+                  <span>Outstanding</span>
+                  <span className={a.outstanding > 0 ? "text-primary" : "text-success"}>
                     {pkr(a.outstanding)}
-                  </td>
-                  <td className="p-2 text-white/70">{a.notes ?? "—"}</td>
-                  <td className="p-2 text-white/70">
-                    {a.created_by ? (names[a.created_by] ?? "—") : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </span>
+                </div>
+                <div className="mobile-data-row">
+                  <span>Given By</span>
+                  <span>{a.created_by ? (names[a.created_by] ?? "-") : "-"}</span>
+                </div>
+                {a.notes && <div className="mt-2 text-xs text-muted-foreground">{a.notes}</div>}
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -1279,65 +1473,118 @@ function EmployeesTab({
       </div>
 
       <Card className="bg-[#111827] border-white/5 overflow-hidden">
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="min-w-full text-xs">
-            <thead>
-              <tr className="bg-[#0A0F1E] text-amber-300/90 uppercase tracking-wider">
-                <th className="p-2 text-left">Code</th>
-                <th className="p-2 text-left">Name</th>
-                <th className="p-2 text-left">Designation</th>
-                <th className="p-2 text-left">Department</th>
-                <th className="p-2 text-right">Base Salary</th>
-                <th className="p-2 text-center">Working Days</th>
-                <th className="p-2 text-right">Overtime Rate</th>
-                <th className="p-2 text-right">Fixed Allowance</th>
-                <th className="p-2 text-center">Active</th>
-                <th className="p-2 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-white/90">
-              {employees.map((e) => (
-                <tr key={e.id} className="border-t border-white/5">
-                  <td className="p-2">{e.employee_code}</td>
-                  <td className="p-2 font-medium">{e.full_name}</td>
-                  <td className="p-2 text-white/70">{e.designation ?? "—"}</td>
-                  <td className="p-2 text-white/70">{e.department ?? "—"}</td>
-                  <td className="p-2 text-right">{pkr(e.base_salary)}</td>
-                  <td className="p-2 text-center">{e.standard_working_days}</td>
-                  <td className="p-2 text-right">{pkr(e.overtime_rate)}</td>
-                  <td className="p-2 text-right">{pkr(e.fixed_allowance)}</td>
-                  <td className="p-2 text-center">
-                    {e.is_active ? (
-                      <Badge variant="outline" className="border-success/30 text-success">
-                        Active
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="border-muted-foreground/30 text-muted-foreground"
-                      >
-                        Inactive
-                      </Badge>
-                    )}
-                  </td>
-                  <td className="p-2 text-center">
-                    {isAdmin && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditing(e);
-                          setDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </td>
+        <CardContent className="p-0">
+          <div className="desktop-table overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="bg-[#0A0F1E] text-amber-300/90 uppercase tracking-wider">
+                  <th className="p-2 text-left">Code</th>
+                  <th className="p-2 text-left">Name</th>
+                  <th className="p-2 text-left">Designation</th>
+                  <th className="p-2 text-left">Department</th>
+                  <th className="p-2 text-right">Base Salary</th>
+                  <th className="p-2 text-center">Working Days</th>
+                  <th className="p-2 text-right">Overtime Rate</th>
+                  <th className="p-2 text-right">Fixed Allowance</th>
+                  <th className="p-2 text-center">Active</th>
+                  <th className="p-2 text-center">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="text-white/90">
+                {employees.map((e) => (
+                  <tr key={e.id} className="border-t border-white/5">
+                    <td className="p-2">{e.employee_code}</td>
+                    <td className="p-2 font-medium">{e.full_name}</td>
+                    <td className="p-2 text-white/70">{e.designation ?? "—"}</td>
+                    <td className="p-2 text-white/70">{e.department ?? "—"}</td>
+                    <td className="p-2 text-right">{pkr(e.base_salary)}</td>
+                    <td className="p-2 text-center">{e.standard_working_days}</td>
+                    <td className="p-2 text-right">{pkr(e.overtime_rate)}</td>
+                    <td className="p-2 text-right">{pkr(e.fixed_allowance)}</td>
+                    <td className="p-2 text-center">
+                      {e.is_active ? (
+                        <Badge variant="outline" className="border-success/30 text-success">
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="border-muted-foreground/30 text-muted-foreground"
+                        >
+                          Inactive
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="p-2 text-center">
+                      {isAdmin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditing(e);
+                            setDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mobile-card-list">
+            {employees.map((e) => (
+              <div key={e.id} className="mobile-data-card space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold">{e.full_name}</div>
+                    <div className="text-xs text-muted-foreground">{e.employee_code}</div>
+                  </div>
+                  {e.is_active ? (
+                    <Badge variant="outline" className="border-success/30 text-success">
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="border-muted-foreground/30 text-muted-foreground"
+                    >
+                      Inactive
+                    </Badge>
+                  )}
+                </div>
+                <div className="mobile-data-row">
+                  <span>Designation</span>
+                  <span>{e.designation ?? "-"}</span>
+                </div>
+                <div className="mobile-data-row">
+                  <span>Department</span>
+                  <span>{e.department ?? "-"}</span>
+                </div>
+                <div className="mobile-data-row">
+                  <span>Base Salary</span>
+                  <span>{pkr(e.base_salary)}</span>
+                </div>
+                <div className="mobile-data-row">
+                  <span>Working Days</span>
+                  <span>{e.standard_working_days}</span>
+                </div>
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditing(e);
+                      setDialogOpen(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -1454,7 +1701,7 @@ function EmployeeDialog({
         <DialogHeader>
           <DialogTitle>{editing ? "Edit Employee" : "Add Employee"}</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field
             label="Employee Code"
             value={form.employee_code}
@@ -1512,7 +1759,7 @@ function EmployeeDialog({
             />
             <Label className="text-xs">Active</Label>
           </div>
-          <div className="col-span-2 space-y-1">
+          <div className="space-y-1 sm:col-span-2">
             <Label className="text-xs">Notes</Label>
             <Textarea
               value={form.notes}

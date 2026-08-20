@@ -154,7 +154,7 @@ export const generateInvoiceReminderQueue = createServerFn({ method: "POST" })
     const { data: invoiceRows, error: invoiceError } = await (context.supabase as any)
       .from("invoices")
       .select(
-        "id, invoice_no, client_id, date, delivery_date, due_date, amount, amount_received, payment_status, is_deleted, clients(id, legal_name, phone, phone_normalized, whatsapp_opt_out, reminders_paused)",
+        "id, invoice_no, client_id, date, delivery_date, due_date, amount, amount_received, payment_status, receiving_status, is_deleted, clients(id, legal_name, phone, phone_normalized, whatsapp_opt_out, reminders_paused)",
       )
       .or("is_deleted.is.null,is_deleted.eq.false");
 

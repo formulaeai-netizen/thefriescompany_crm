@@ -107,7 +107,7 @@ export const listPayroll = createServerFn({ method: "GET" })
          bonus, allowances, commission, other_earnings, unpaid_leave_deduction, advance_deduction,
          other_deduction, total_deductions, manual_adjustment, manual_adjustment_reason, gross_salary,
          net_salary, notes, paid, paid_at, paid_by, finalized_at, finalized_by, cancelled_at, cancelled_by,
-         cancel_reason, created_by, created_at, updated_at`,
+         cancel_reason, paid_from_account_id, created_by, created_at, updated_at`,
       )
       .order("created_at", { ascending: true });
     if (error) throw new Error(`Payroll list failed: ${error.message}`);
@@ -126,7 +126,9 @@ export const listSalaryAdvances = createServerFn({ method: "GET" })
     const [{ data: advances, error: advErr }, { data: links, error: linkErr }] = await Promise.all([
       (context.supabase as any)
         .from("salary_advances")
-        .select("id, employee_ref_id, amount, advance_date, notes, created_by, created_at")
+        .select(
+          "id, employee_ref_id, amount, advance_date, notes, paid_from_account_id, created_by, created_at",
+        )
         .order("advance_date", { ascending: false }),
       (context.supabase as any)
         .from("payroll_advance_links")
@@ -250,6 +252,7 @@ export const savePayrollDraft = createServerFn({ method: "POST" })
   });
 
 const payrollIdSchema = z.object({ payroll_id: z.string().uuid() });
+const paidPayrollSchema = payrollIdSchema.extend({ paid_from_account_id: z.string().uuid() });
 
 export const finalizePayroll = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -302,11 +305,12 @@ export const cancelPayroll = createServerFn({ method: "POST" })
  */
 export const markPayrollPaid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => payrollIdSchema.parse(data))
+  .validator((data: unknown) => paidPayrollSchema.parse(data))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { error } = await (context.supabase as any).rpc("mark_payroll_paid", {
       _payroll_id: data.payroll_id,
+      _paid_from_account_id: data.paid_from_account_id,
     });
     if (error) throw new Error(`Marking payroll paid failed: ${error.message}`);
     return { ok: true };
@@ -317,6 +321,7 @@ const createAdvanceSchema = z.object({
   amount: z.number().positive("Advance amount must be positive"),
   advance_date: z.string().min(1).optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
+  paid_from_account_id: z.string().uuid(),
 });
 
 export const createSalaryAdvance = createServerFn({ method: "POST" })
@@ -329,6 +334,7 @@ export const createSalaryAdvance = createServerFn({ method: "POST" })
       _amount: data.amount,
       _advance_date: data.advance_date ?? new Date().toISOString().slice(0, 10),
       _notes: data.notes?.trim() || null,
+      _paid_from_account_id: data.paid_from_account_id,
     });
     if (error) throw new Error(`Salary advance creation failed: ${error.message}`);
     return { ok: true, id: id as string };

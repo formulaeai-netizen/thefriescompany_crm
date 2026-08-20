@@ -18,13 +18,16 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, Bell, LogOut, Loader2, Command as CommandIcon } from "lucide-react";
+import { Moon, Sun, LogOut, Loader2, Command as CommandIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMyRoles, allowedRolesFor, homeForRoles } from "@/lib/roles";
 import { toast } from "sonner";
 import { CommandPalette, useCommandPalette } from "@/components/command-palette";
 import { registerPWA } from "@/lib/pwa-register";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { PwaStatus } from "@/components/pwa-status";
+import { NotificationCenter } from "@/components/notification-center";
 
 function NotFoundComponent() {
   return (
@@ -195,10 +198,12 @@ function RootComponent() {
         <RoleGuard>
           <SidebarProvider>
             <div className="flex min-h-screen w-full bg-background text-foreground">
-              <AppSidebar />
+              <div className="hidden md:block">
+                <AppSidebar />
+              </div>
               <div className="flex flex-1 flex-col min-w-0">
                 <TopBar />
-                <main className="flex-1 px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8 min-w-0 overflow-x-hidden">
+                <main className="flex-1 px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8 min-w-0 overflow-x-hidden">
                   <div key={pathname} className="page-transition">
                     <Outlet />
                   </div>
@@ -207,6 +212,8 @@ function RootComponent() {
             </div>
             <Toaster richColors position="top-right" />
             <GlobalCommandPalette />
+            <PwaStatus />
+            <MobileBottomNav />
           </SidebarProvider>
         </RoleGuard>
       </ThemeProvider>
@@ -220,7 +227,8 @@ function GlobalCommandPalette() {
 }
 
 function RoleGuard({ children }: { children: ReactNode }) {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const location = useRouterState({ select: (s) => s.location });
+  const pathname = location.pathname;
   const navigate = useNavigate();
   const { data: roles, isLoading, isReady, hasSession, isError } = useMyRoles();
 
@@ -228,7 +236,7 @@ function RoleGuard({ children }: { children: ReactNode }) {
     if (!isReady) return;
     if (pathname === "/auth") return;
     if (!hasSession) {
-      navigate({ to: "/auth", replace: true });
+      navigate({ to: "/auth", search: { redirect: location.href }, replace: true });
       return;
     }
     if (isLoading) return;
@@ -246,7 +254,7 @@ function RoleGuard({ children }: { children: ReactNode }) {
       toast.error("Access denied");
       navigate({ to: homeForRoles(roles), replace: true });
     }
-  }, [roles, isLoading, isReady, hasSession, isError, pathname, navigate]);
+  }, [roles, isLoading, isReady, hasSession, isError, pathname, location.href, navigate]);
 
   // Block protected content until session + roles are known.
   if (!isReady || (hasSession && isLoading)) {
@@ -273,14 +281,18 @@ function TopBar() {
     navigate({ to: "/auth", replace: true });
   };
   return (
-    <header className="sticky top-0 z-30 flex min-h-[64px] items-center justify-between border-b border-border bg-background px-4 py-3 lg:px-8">
+    <header className="sticky top-0 z-30 flex min-h-[56px] items-center justify-between border-b border-border bg-background/95 px-3 py-2 backdrop-blur sm:min-h-[64px] sm:px-4 sm:py-3 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
-        <SidebarTrigger className="-ml-1 shrink-0" />
+        <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex" />
         <div className="min-w-0">
-          <h1 className="font-display truncate text-xl font-medium leading-tight text-foreground">
+          <h1 className="font-display truncate text-lg font-medium leading-tight text-foreground sm:text-xl">
             {title}
           </h1>
-          {subtitle && <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>}
+          {subtitle && (
+            <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block">
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
@@ -295,16 +307,14 @@ function TopBar() {
         <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
-        <Button variant="ghost" size="icon" aria-label="Notifications">
-          <Bell className="h-4 w-4" />
-        </Button>
+        <NotificationCenter />
         <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
           <LogOut className="h-4 w-4" />
         </Button>
         <img
           src="/logo.png"
           alt="The Fries Company"
-          className="ml-2 h-9 w-9 rounded-full object-contain"
+          className="ml-1 h-8 w-8 rounded-full object-contain sm:ml-2 sm:h-9 sm:w-9"
         />
       </div>
     </header>
@@ -316,9 +326,14 @@ function pageMeta(pathname: string): { title: string; subtitle?: string } {
     return { title: "Dashboard", subtitle: "Live overview of revenue, collections and signals" };
   const map: Record<string, { title: string; subtitle: string }> = {
     "/clients": { title: "Clients & Leads", subtitle: "Accounts, contacts and pipeline" },
+    "/orders": { title: "Sales Orders", subtitle: "Confirmed demand and planning foundation" },
     "/inventory": { title: "Inventory", subtitle: "Stock levels and reorder points" },
     "/invoices/deleted": { title: "Deleted Invoices", subtitle: "Soft-deleted archive" },
     "/invoices": { title: "Invoices", subtitle: "Billing, collections and status" },
+    "/customer-ledger": {
+      title: "Customer Ledger",
+      subtitle: "Branch-wise stock, invoices and receivables",
+    },
     "/production": { title: "Daily Production", subtitle: "Raw input, output and variance" },
     "/delivery-calculator": {
       title: "Delivery Calculator",

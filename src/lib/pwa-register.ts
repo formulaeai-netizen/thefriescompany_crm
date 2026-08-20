@@ -35,8 +35,28 @@ export function registerPWA() {
     return;
   }
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((err) => {
-      console.warn("[pwa] service worker registration failed", err);
-    });
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((registration) => {
+        registration.addEventListener("updatefound", () => {
+          const worker = registration.installing;
+          if (!worker) return;
+          worker.addEventListener("statechange", () => {
+            if (worker.state === "installed" && navigator.serviceWorker.controller) {
+              window.dispatchEvent(new CustomEvent("fryguys:pwa-update", { detail: registration }));
+            }
+          });
+        });
+        if (registration.waiting && navigator.serviceWorker.controller) {
+          window.dispatchEvent(new CustomEvent("fryguys:pwa-update", { detail: registration }));
+        }
+      })
+      .catch((err) => {
+        console.warn("[pwa] service worker registration failed", err);
+      });
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    window.dispatchEvent(new Event("fryguys:pwa-controllerchange"));
   });
 }

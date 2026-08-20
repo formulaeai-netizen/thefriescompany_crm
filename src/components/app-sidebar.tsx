@@ -1,33 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { fetchInvoices, fetchClients, fetchExpenses, fetchInventory } from "@/lib/queries";
-import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  Receipt,
-  Settings as SettingsIcon,
-  Package,
-  LineChart,
-  Snowflake,
-  Moon,
-  Sun,
-  Trash2,
-  Factory,
-  MessageSquare,
-  BarChart3,
-  TrendingUp,
-  Wallet,
-  Banknote,
-  Undo2,
-  BellRing,
-  CheckCircle2,
-  Scale,
-  ClipboardCheck,
-  AlertTriangle,
-  HandCoins,
-} from "lucide-react";
-import { Truck } from "lucide-react";
+import { Moon, Snowflake, Sun } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -44,143 +18,9 @@ import {
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { isInvoiceReminderEligible } from "@/lib/invoice-reminders";
+import { allItems, isActiveNavItem, sectionOrder, type NavItem } from "@/lib/nav-items";
 import { useMyRoles } from "@/lib/roles";
-import type { AppRole } from "@/lib/roles";
 const logoSrc = "/logo.png";
-
-type NavItem = {
-  title: string;
-  url: string;
-  icon: typeof LayoutDashboard;
-  roles: AppRole[];
-  muted?: boolean;
-  section: "Overview" | "Operations" | "Finance" | "Signals";
-  badgeKey?: "overdue";
-};
-
-const allItems: NavItem[] = [
-  { section: "Overview", title: "Dashboard", url: "/", icon: LayoutDashboard, roles: ["admin"] },
-  { section: "Overview", title: "Clients & Leads", url: "/clients", icon: Users, roles: ["admin"] },
-  {
-    section: "Overview",
-    title: "My Dashboard",
-    url: "/investor",
-    icon: Wallet,
-    roles: ["investor"],
-  },
-
-  {
-    section: "Operations",
-    title: "Inventory",
-    url: "/inventory",
-    icon: Package,
-    roles: ["admin", "staff"],
-  },
-  {
-    section: "Operations",
-    title: "Daily Production",
-    url: "/production",
-    icon: Factory,
-    roles: ["admin", "staff"],
-  },
-  {
-    section: "Operations",
-    title: "Delivery Calculator",
-    url: "/delivery-calculator",
-    icon: Truck,
-    roles: ["admin", "staff"],
-  },
-  {
-    section: "Operations",
-    title: "Wastage Verifications",
-    url: "/wastage-verifications",
-    icon: Scale,
-    // Admin-only final approval; Moderator gets a read-only review queue.
-    // Staff submit from Daily Production instead and never see this page.
-    roles: ["admin", "moderator"],
-  },
-  {
-    section: "Operations",
-    title: "Stock Audits",
-    url: "/stock-audits",
-    icon: ClipboardCheck,
-    roles: ["admin", "staff", "moderator"],
-  },
-
-  {
-    section: "Finance",
-    title: "Invoices",
-    url: "/invoices",
-    icon: FileText,
-    roles: ["admin", "staff"],
-    badgeKey: "overdue",
-  },
-  {
-    section: "Finance",
-    title: "Deleted Invoices",
-    url: "/invoices/deleted",
-    icon: Trash2,
-    muted: true,
-    roles: ["admin"],
-  },
-  { section: "Finance", title: "Returns", url: "/returns", icon: Undo2, roles: ["admin", "staff"] },
-  {
-    section: "Finance",
-    title: "Expenses",
-    url: "/expenses",
-    icon: Receipt,
-    roles: ["admin", "staff"],
-  },
-  { section: "Finance", title: "P&L", url: "/pnl", icon: LineChart, roles: ["admin"] },
-  { section: "Finance", title: "Investors", url: "/investors", icon: TrendingUp, roles: ["admin"] },
-  { section: "Finance", title: "Salaries", url: "/salaries", icon: Banknote, roles: ["admin"] },
-  {
-    section: "Finance",
-    title: "Credit Inventory Purchases",
-    url: "/credit-inventory-purchases",
-    icon: HandCoins,
-    roles: ["admin", "staff", "moderator"],
-  },
-
-  {
-    section: "Signals",
-    title: "Customer Analytics",
-    url: "/customer-analytics",
-    icon: BarChart3,
-    roles: ["admin"],
-  },
-  {
-    section: "Signals",
-    title: "WhatsApp Logs",
-    url: "/whatsapp-logs",
-    icon: MessageSquare,
-    roles: ["admin"],
-  },
-  {
-    section: "Signals",
-    title: "Payment Reminders",
-    url: "/payment-reminders",
-    icon: BellRing,
-    roles: ["admin"],
-  },
-  {
-    section: "Signals",
-    title: "Payment Verifications",
-    url: "/payment-verifications",
-    icon: CheckCircle2,
-    roles: ["admin"],
-  },
-  {
-    section: "Signals",
-    title: "Operational Alerts",
-    url: "/operational-alerts",
-    icon: AlertTriangle,
-    roles: ["admin", "moderator"],
-  },
-  { section: "Signals", title: "Settings", url: "/settings", icon: SettingsIcon, roles: ["admin"] },
-];
-
-const SECTION_ORDER: NavItem["section"][] = ["Overview", "Operations", "Finance", "Signals"];
 
 type InvoiceBadgeRow = {
   amount?: number | string | null;
@@ -218,10 +58,12 @@ export function AppSidebar() {
     "/inventory": () => qc.prefetchQuery({ queryKey: ["inventory"], queryFn: fetchInventory }),
   };
 
-  const grouped = SECTION_ORDER.map((section) => ({
-    section,
-    entries: items.filter((it) => it.section === section),
-  })).filter((g) => g.entries.length > 0);
+  const grouped = sectionOrder
+    .map((section) => ({
+      section,
+      entries: items.filter((it) => it.section === section),
+    }))
+    .filter((g) => g.entries.length > 0);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
@@ -247,13 +89,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
                 {group.entries.map((item) => {
-                  const active =
-                    item.url === "/"
-                      ? pathname === "/"
-                      : item.url === "/invoices"
-                        ? pathname === "/invoices" ||
-                          (pathname.startsWith("/invoices") && pathname !== "/invoices/deleted")
-                        : pathname === item.url || pathname.startsWith(item.url + "/");
+                  const active = isActiveNavItem(pathname, item);
                   const showBadge = item.badgeKey === "overdue" && overdueCount > 0;
                   return (
                     <SidebarMenuItem key={item.url}>

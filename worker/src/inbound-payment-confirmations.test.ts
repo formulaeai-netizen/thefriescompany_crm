@@ -27,7 +27,10 @@ class MemoryInboundRepository implements InboundPaymentRepository {
 
   async findOpenInvoicesForClient() {
     return this.invoices.filter(
-      (invoice) => invoice.payment_status !== "Done" && !invoice.is_deleted,
+      (invoice) =>
+        invoice.payment_status !== "Done" &&
+        invoice.receiving_status !== "awaiting_receiving" &&
+        !invoice.is_deleted,
     );
   }
 
@@ -132,6 +135,17 @@ test("already-paid invoice is blocked", async () => {
   assert.equal(repo.requests.length, 0);
 });
 
+test("awaiting-receiving invoice is not payable by strict PAID command", async () => {
+  const repo = new MemoryInboundRepository(client, [
+    { ...openInvoice, receiving_status: "awaiting_receiving" },
+  ]);
+  const result = await handleIncomingPaymentMessage(repo, message(), createInboundContext());
+
+  assert.equal(result.kind, "strict_command_rejected");
+  if (result.kind === "strict_command_rejected") assert.equal(result.reason, "invoice_not_open");
+  assert.equal(repo.requests.length, 0);
+});
+
 test("archived (is_deleted) invoice is blocked", async () => {
   const repo = new MemoryInboundRepository(client, [{ ...openInvoice, is_deleted: true }]);
   const result = await handleIncomingPaymentMessage(repo, message(), createInboundContext());
@@ -210,6 +224,23 @@ test("one open invoice returns the exact early-payment template", async () => {
     0,
     "early-payment message must never create a verification request",
   );
+});
+
+test("early-payment guidance ignores awaiting-receiving invoices", async () => {
+  const repo = new MemoryInboundRepository(client, [
+    { ...openInvoice, receiving_status: "awaiting_receiving" },
+  ]);
+  const result = await handleIncomingPaymentMessage(
+    repo,
+    message({ body: "Paid" }),
+    createInboundContext(),
+  );
+
+  assert.equal(result.kind, "early_payment_reply");
+  if (result.kind === "early_payment_reply") {
+    assert.equal(result.invoiceCount, 0);
+    assert.match(result.reply, /koi outstanding invoice nahi/i);
+  }
 });
 
 test("no open invoice returns a safe no-outstanding-invoice reply", async () => {

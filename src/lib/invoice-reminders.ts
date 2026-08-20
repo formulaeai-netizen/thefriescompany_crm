@@ -2,6 +2,7 @@ export type InvoiceOutstandingInput = {
   amount?: number | string | null;
   amount_received?: number | string | null;
   payment_status?: string | null;
+  receiving_status?: string | null;
 };
 
 export type ReminderEligibilityInput = InvoiceOutstandingInput & {
@@ -26,7 +27,8 @@ export type ReminderSkipCode =
   | "paused_client"
   | "duplicate"
   | "max_reminders_reached"
-  | "before_launch_date";
+  | "before_launch_date"
+  | "awaiting_receiving";
 
 export type ReminderClientInput = {
   id?: string | null;
@@ -223,6 +225,7 @@ export function calculateInvoiceDueDate(deliveryDate: string | null | undefined)
 }
 
 export function calculateOutstandingAmount(invoice: InvoiceOutstandingInput): number {
+  if (invoice.receiving_status === "awaiting_receiving") return 0;
   if (invoice.payment_status === "Done") return 0;
   return Math.max(toFiniteMoney(invoice.amount) - toFiniteMoney(invoice.amount_received), 0);
 }
@@ -294,6 +297,7 @@ export function isInvoiceReminderEligible(
   today: Date = new Date(),
 ): boolean {
   if (invoice.is_deleted) return false;
+  if (invoice.receiving_status === "awaiting_receiving") return false;
   if (invoice.payment_status !== "Not Done" && invoice.payment_status !== "Partial") return false;
   if (!invoice.due_date) return false;
   if (calculateOutstandingAmount(invoice) <= 0) return false;
@@ -348,6 +352,26 @@ export function buildReminderQueueGeneration(
 
   for (const invoice of invoices) {
     if (invoice.is_deleted) continue;
+
+    if (invoice.receiving_status === "awaiting_receiving") {
+      addPreview(
+        report,
+        sampleLimit,
+        createPreviewRow(
+          invoice,
+          getReminderClient(invoice.clients),
+          toIsoDate(invoice.due_date),
+          calculateDaysOverdue(invoice.due_date, today),
+          null,
+          0,
+          null,
+          "",
+          "skipped",
+          "awaiting_receiving",
+        ),
+      );
+      continue;
+    }
 
     if (invoice.payment_status === "Done") {
       report.skipped_paid++;

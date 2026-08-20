@@ -12,6 +12,8 @@ export type AppRole = "admin" | "staff" | "investor" | "moderator";
 export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] }> = [
   { prefix: "/investor", roles: ["investor", "admin"] },
   { prefix: "/inventory", roles: ["admin", "staff"] },
+  { prefix: "/orders", roles: ["admin", "moderator"] },
+  { prefix: "/production-planning", roles: ["admin", "moderator"] },
   { prefix: "/production", roles: ["admin", "staff"] },
   { prefix: "/invoices/deleted", roles: ["admin"] },
   { prefix: "/invoices", roles: ["admin", "staff"] },
@@ -27,6 +29,9 @@ export const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] }> = [
   { prefix: "/whatsapp-logs", roles: ["admin"] },
   { prefix: "/salaries", roles: ["admin"] },
   { prefix: "/settings", roles: ["admin"] },
+  // AI Watchdog: Admin sees every anomaly; DB RLS/server reads restrict
+  // Moderator/Staff to permitted inventory/operational anomaly data only.
+  { prefix: "/ai-watchdog", roles: ["admin", "moderator", "staff"] },
   // Wastage verification review queue: final approval is Admin-only inside
   // the page itself; Moderator gets read-only metadata (no image access,
   // no decision controls). Staff submit from /production instead and never

@@ -126,6 +126,8 @@ export type Database = {
           notes: string | null;
           pack_size_kg: number;
           packs_produced: number | null;
+          product_id: string | null;
+          production_plan_item_id: string | null;
           raw_input_kg: number;
           target_packs: number | null;
           usable_kg: number | null;
@@ -143,6 +145,8 @@ export type Database = {
           notes?: string | null;
           pack_size_kg?: number;
           packs_produced?: number | null;
+          product_id?: string | null;
+          production_plan_item_id?: string | null;
           raw_input_kg: number;
           target_packs?: number | null;
           usable_kg?: number | null;
@@ -160,6 +164,8 @@ export type Database = {
           notes?: string | null;
           pack_size_kg?: number;
           packs_produced?: number | null;
+          product_id?: string | null;
+          production_plan_item_id?: string | null;
           raw_input_kg?: number;
           target_packs?: number | null;
           usable_kg?: number | null;
@@ -167,7 +173,22 @@ export type Database = {
           variance_reason?: string | null;
           wastage_percent?: number;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "daily_production_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "daily_production_production_plan_item_id_fkey";
+            columns: ["production_plan_item_id"];
+            isOneToOne: false;
+            referencedRelation: "production_plan_items";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       damaged_stock: {
         Row: {
@@ -683,9 +704,13 @@ export type Database = {
           last_reminder_type: string | null;
           no_of_packs: number | null;
           payment_status: Database["public"]["Enums"]["payment_status_enum"] | null;
+          receiving_confirmed_at: string | null;
+          receiving_status: string;
           reminder_sent: boolean | null;
           reminder_sent_at: string | null;
           screenshot_verified: boolean | null;
+          sales_order_fulfillment_id: string | null;
+          sales_order_id: string | null;
           total_reminders_sent: number | null;
           transaction_id: string | null;
           unit_price: number | null;
@@ -712,9 +737,13 @@ export type Database = {
           last_reminder_type?: string | null;
           no_of_packs?: number | null;
           payment_status?: Database["public"]["Enums"]["payment_status_enum"] | null;
+          receiving_confirmed_at?: string | null;
+          receiving_status?: string;
           reminder_sent?: boolean | null;
           reminder_sent_at?: string | null;
           screenshot_verified?: boolean | null;
+          sales_order_fulfillment_id?: string | null;
+          sales_order_id?: string | null;
           total_reminders_sent?: number | null;
           transaction_id?: string | null;
           unit_price?: number | null;
@@ -741,9 +770,13 @@ export type Database = {
           last_reminder_type?: string | null;
           no_of_packs?: number | null;
           payment_status?: Database["public"]["Enums"]["payment_status_enum"] | null;
+          receiving_confirmed_at?: string | null;
+          receiving_status?: string;
           reminder_sent?: boolean | null;
           reminder_sent_at?: string | null;
           screenshot_verified?: boolean | null;
+          sales_order_fulfillment_id?: string | null;
+          sales_order_id?: string | null;
           total_reminders_sent?: number | null;
           transaction_id?: string | null;
           unit_price?: number | null;
@@ -762,6 +795,20 @@ export type Database = {
             columns: ["client_id"];
             isOneToOne: false;
             referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_sales_order_fulfillment_id_fkey";
+            columns: ["sales_order_fulfillment_id"];
+            isOneToOne: false;
+            referencedRelation: "sales_order_fulfillments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_sales_order_id_fkey";
+            columns: ["sales_order_id"];
+            isOneToOne: false;
+            referencedRelation: "sales_orders";
             referencedColumns: ["id"];
           },
         ];
@@ -1244,6 +1291,406 @@ export type Database = {
             columns: ["client_id"];
             isOneToOne: false;
             referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sales_orders: {
+        Row: {
+          assigned_to: string | null;
+          branch_id: string | null;
+          branch_name_snapshot: string | null;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          cancellation_reason: string | null;
+          client_id: string;
+          client_name_snapshot: string;
+          confirmed_at: string | null;
+          confirmed_by: string | null;
+          created_at: string;
+          created_by: string | null;
+          customer_notes: string | null;
+          external_source_key: string | null;
+          id: string;
+          internal_notes: string | null;
+          order_number: string;
+          order_source: string;
+          ordered_at: string;
+          priority: string;
+          promised_delivery_date: string | null;
+          requested_delivery_date: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          assigned_to?: string | null;
+          branch_id?: string | null;
+          branch_name_snapshot?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cancellation_reason?: string | null;
+          client_id: string;
+          client_name_snapshot: string;
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          customer_notes?: string | null;
+          external_source_key?: string | null;
+          id?: string;
+          internal_notes?: string | null;
+          order_number: string;
+          order_source?: string;
+          ordered_at?: string;
+          priority?: string;
+          promised_delivery_date?: string | null;
+          requested_delivery_date: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          assigned_to?: string | null;
+          branch_id?: string | null;
+          branch_name_snapshot?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cancellation_reason?: string | null;
+          client_id?: string;
+          client_name_snapshot?: string;
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          customer_notes?: string | null;
+          external_source_key?: string | null;
+          id?: string;
+          internal_notes?: string | null;
+          order_number?: string;
+          order_source?: string;
+          ordered_at?: string;
+          priority?: string;
+          promised_delivery_date?: string | null;
+          requested_delivery_date?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sales_orders_assigned_to_fkey";
+            columns: ["assigned_to"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_orders_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_orders_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sales_order_items: {
+        Row: {
+          created_at: string;
+          id: string;
+          line_total: number | null;
+          notes: string | null;
+          product_id: string;
+          product_name_snapshot: string;
+          quantity: number;
+          sales_order_id: string;
+          unit: string;
+          unit_price: number | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          line_total?: number | null;
+          notes?: string | null;
+          product_id: string;
+          product_name_snapshot: string;
+          quantity: number;
+          sales_order_id: string;
+          unit: string;
+          unit_price?: number | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          line_total?: number | null;
+          notes?: string | null;
+          product_id?: string;
+          product_name_snapshot?: string;
+          quantity?: number;
+          sales_order_id?: string;
+          unit?: string;
+          unit_price?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sales_order_items_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_order_items_sales_order_id_fkey";
+            columns: ["sales_order_id"];
+            isOneToOne: false;
+            referencedRelation: "sales_orders";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sales_order_fulfillments: {
+        Row: {
+          branch_id: string | null;
+          client_id: string;
+          confirmed_by: string | null;
+          created_at: string;
+          delivered_at: string | null;
+          dispatched_at: string | null;
+          id: string;
+          invoice_id: string | null;
+          notes: string | null;
+          planned_at: string;
+          proof_file_name: string | null;
+          proof_mime_type: string | null;
+          proof_storage_path: string | null;
+          receiving_confirmed_at: string | null;
+          receiving_notes: string | null;
+          recipient_name: string | null;
+          responsible_user: string | null;
+          sales_order_id: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          branch_id?: string | null;
+          client_id: string;
+          confirmed_by?: string | null;
+          created_at?: string;
+          delivered_at?: string | null;
+          dispatched_at?: string | null;
+          id?: string;
+          invoice_id?: string | null;
+          notes?: string | null;
+          planned_at?: string;
+          proof_file_name?: string | null;
+          proof_mime_type?: string | null;
+          proof_storage_path?: string | null;
+          receiving_confirmed_at?: string | null;
+          receiving_notes?: string | null;
+          recipient_name?: string | null;
+          responsible_user?: string | null;
+          sales_order_id: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          branch_id?: string | null;
+          client_id?: string;
+          confirmed_by?: string | null;
+          created_at?: string;
+          delivered_at?: string | null;
+          dispatched_at?: string | null;
+          id?: string;
+          invoice_id?: string | null;
+          notes?: string | null;
+          planned_at?: string;
+          proof_file_name?: string | null;
+          proof_mime_type?: string | null;
+          proof_storage_path?: string | null;
+          receiving_confirmed_at?: string | null;
+          receiving_notes?: string | null;
+          recipient_name?: string | null;
+          responsible_user?: string | null;
+          sales_order_id?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sales_order_fulfillments_branch_id_fkey";
+            columns: ["branch_id"];
+            isOneToOne: false;
+            referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_order_fulfillments_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_order_fulfillments_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_order_fulfillments_sales_order_id_fkey";
+            columns: ["sales_order_id"];
+            isOneToOne: false;
+            referencedRelation: "sales_orders";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sales_order_fulfillment_items: {
+        Row: {
+          accepted_quantity: number;
+          created_at: string;
+          delivered_quantity: number;
+          dispatched_quantity: number;
+          fulfillment_id: string;
+          id: string;
+          invoice_id: string | null;
+          notes: string | null;
+          ordered_quantity_snapshot: number;
+          planned_quantity: number;
+          product_id: string;
+          product_name_snapshot: string;
+          rejected_quantity: number;
+          sales_order_item_id: string;
+          unit: string;
+          unit_price_snapshot: number | null;
+        };
+        Insert: {
+          accepted_quantity?: number;
+          created_at?: string;
+          delivered_quantity?: number;
+          dispatched_quantity?: number;
+          fulfillment_id: string;
+          id?: string;
+          invoice_id?: string | null;
+          notes?: string | null;
+          ordered_quantity_snapshot: number;
+          planned_quantity: number;
+          product_id: string;
+          product_name_snapshot: string;
+          rejected_quantity?: number;
+          sales_order_item_id: string;
+          unit: string;
+          unit_price_snapshot?: number | null;
+        };
+        Update: {
+          accepted_quantity?: number;
+          created_at?: string;
+          delivered_quantity?: number;
+          dispatched_quantity?: number;
+          fulfillment_id?: string;
+          id?: string;
+          invoice_id?: string | null;
+          notes?: string | null;
+          ordered_quantity_snapshot?: number;
+          planned_quantity?: number;
+          product_id?: string;
+          product_name_snapshot?: string;
+          rejected_quantity?: number;
+          sales_order_item_id?: string;
+          unit?: string;
+          unit_price_snapshot?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sales_order_fulfillment_items_fulfillment_id_fkey";
+            columns: ["fulfillment_id"];
+            isOneToOne: false;
+            referencedRelation: "sales_order_fulfillments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_order_fulfillment_items_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_order_fulfillment_items_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sales_order_fulfillment_items_sales_order_item_id_fkey";
+            columns: ["sales_order_item_id"];
+            isOneToOne: false;
+            referencedRelation: "sales_order_items";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      delivery_accountability_incidents: {
+        Row: {
+          created_at: string;
+          detected_at: string;
+          fulfillment_id: string;
+          id: string;
+          incident_type: string;
+          notes: string | null;
+          penalty_amount: number | null;
+          penalty_recommended: boolean;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          resolution_notes: string | null;
+          responsible_user: string | null;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          detected_at?: string;
+          fulfillment_id: string;
+          id?: string;
+          incident_type: string;
+          notes?: string | null;
+          penalty_amount?: number | null;
+          penalty_recommended?: boolean;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          resolution_notes?: string | null;
+          responsible_user?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          detected_at?: string;
+          fulfillment_id?: string;
+          id?: string;
+          incident_type?: string;
+          notes?: string | null;
+          penalty_amount?: number | null;
+          penalty_recommended?: boolean;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+          resolution_notes?: string | null;
+          responsible_user?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "delivery_accountability_incidents_fulfillment_id_fkey";
+            columns: ["fulfillment_id"];
+            isOneToOne: false;
+            referencedRelation: "sales_order_fulfillments";
             referencedColumns: ["id"];
           },
         ];
@@ -2296,6 +2743,78 @@ export type Database = {
           _user_id: string;
         };
         Returns: boolean;
+      };
+      create_sales_order_fulfillment: {
+        Args: {
+          _items: Json;
+          _notes?: string | null;
+          _order_id: string;
+          _responsible_user?: string | null;
+        };
+        Returns: string;
+      };
+      mark_sales_order_fulfillment_dispatched: {
+        Args: {
+          _fulfillment_id: string;
+        };
+        Returns: undefined;
+      };
+      mark_sales_order_fulfillment_delivered: {
+        Args: {
+          _fulfillment_id: string;
+        };
+        Returns: undefined;
+      };
+      confirm_sales_order_receiving: {
+        Args: {
+          _fulfillment_id: string;
+          _items?: Json;
+          _notes?: string | null;
+          _proof_file_name?: string | null;
+          _proof_mime_type?: string | null;
+          _proof_storage_path?: string | null;
+          _received_at?: string;
+          _recipient_name: string;
+        };
+        Returns: string;
+      };
+      create_missing_receiving_incidents: {
+        Args: {
+          _as_of?: string;
+        };
+        Returns: number;
+      };
+      order_item_fulfillment_totals: {
+        Args: {
+          _sales_order_item_id: string;
+        };
+        Returns: {
+          accepted_quantity: number;
+          delivered_quantity: number;
+          dispatched_quantity: number;
+          planned_quantity: number;
+        }[];
+      };
+      product_demand: {
+        Args: {
+          _today?: string;
+        };
+        Returns: {
+          accepted_quantity: number;
+          affected_customer_branches: Json;
+          commercial_remaining_demand: number;
+          currently_allocated_quantity: number;
+          delivered_quantity: number;
+          earliest_requested_delivery: string;
+          fulfilled_quantity: number;
+          order_count: number;
+          product_id: string;
+          product_name: string;
+          remaining_demand: number;
+          requested_quantity: number;
+          total_confirmed_demand: number;
+          unit: string;
+        }[];
       };
       approve_payment_verification_request: {
         Args: {

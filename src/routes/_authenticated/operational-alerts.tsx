@@ -119,110 +119,170 @@ function OperationalAlertsPage() {
         <CardHeader>
           <CardTitle className="text-base">Alerts</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Routing Flow</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Message</TableHead>
-                <TableHead>System / Physical / Difference</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
+        <CardContent className="p-0">
+          <div className="desktop-table overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
-                    No alerts.
-                  </TableCell>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Routing Flow</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>System / Physical / Difference</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>WhatsApp</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                rows.map((row: any) => {
-                  const flowKey = operationalAlertRoutingFlowKey(row.alert_type);
-                  const isStockVariance = row.alert_type === "stock_variance";
-                  return (
-                    <TableRow key={row.id}>
-                      <TableCell className="text-xs">{row.alert_type}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {WHATSAPP_ROUTING_FLOW_LABELS[flowKey]}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={severityTone(row.severity)}>
-                          {row.severity}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs text-xs text-muted-foreground">
-                        {row.message}
-                      </TableCell>
-                      <TableCell className="text-xs tabular text-muted-foreground">
-                        {row.expected_value != null ? (
-                          <div>
-                            <div>
-                              {isStockVariance ? "System" : "Expected"}: {row.expected_value}
-                              {row.unit ?? ""}
-                            </div>
-                            <div>
-                              {isStockVariance ? "Physical/Reconciled" : "Actual"}:{" "}
-                              {row.actual_value}
-                              {row.unit ?? ""}
-                            </div>
-                            <div>
-                              Difference: {row.variance_value}
-                              {row.unit ?? ""}
-                            </div>
-                          </div>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            row.status === "open"
-                              ? "border-warning/30 text-warning"
-                              : "border-success/30 text-success"
-                          }
-                        >
-                          {row.status}
-                        </Badge>
-                        {row.status === "resolved" && row.resolution_notes && (
-                          <div className="mt-1 text-[10px] text-muted-foreground">
-                            {row.resolution_notes}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {row.whatsapp_notified_at ? (
-                          <Badge variant="outline" className="border-success/30 text-success">
-                            Notified
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No alerts.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((row: any) => {
+                    const flowKey = operationalAlertRoutingFlowKey(row.alert_type);
+                    const isStockVariance = row.alert_type === "stock_variance";
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell className="text-xs">{row.alert_type}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {WHATSAPP_ROUTING_FLOW_LABELS[flowKey]}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={severityTone(row.severity)}>
+                            {row.severity}
                           </Badge>
-                        ) : (
+                        </TableCell>
+                        <TableCell className="max-w-xs text-xs text-muted-foreground">
+                          {row.message}
+                        </TableCell>
+                        <TableCell className="text-xs tabular text-muted-foreground">
+                          {row.expected_value != null ? (
+                            <div>
+                              <div>
+                                {isStockVariance ? "System" : "Expected"}: {row.expected_value}
+                                {row.unit ?? ""}
+                              </div>
+                              <div>
+                                {isStockVariance ? "Physical/Reconciled" : "Actual"}:{" "}
+                                {row.actual_value}
+                                {row.unit ?? ""}
+                              </div>
+                              <div>
+                                Difference: {row.variance_value}
+                                {row.unit ?? ""}
+                              </div>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <Badge
                             variant="outline"
-                            className="border-muted-foreground/30 text-muted-foreground"
+                            className={
+                              row.status === "open"
+                                ? "border-warning/30 text-warning"
+                                : "border-success/30 text-success"
+                            }
                           >
-                            Not notified
+                            {row.status}
                           </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {new Date(row.created_at).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <ResolveDialog alertId={row.id} disabled={row.status !== "open"} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                          {row.status === "resolved" && row.resolution_notes && (
+                            <div className="mt-1 text-[10px] text-muted-foreground">
+                              {row.resolution_notes}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {row.whatsapp_notified_at ? (
+                            <Badge variant="outline" className="border-success/30 text-success">
+                              Notified
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="border-muted-foreground/30 text-muted-foreground"
+                            >
+                              Not notified
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(row.created_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <ResolveDialog alertId={row.id} disabled={row.status !== "open"} />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mobile-card-list">
+            {rows.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">No alerts.</div>
+            ) : (
+              rows.map((row: any) => {
+                const flowKey = operationalAlertRoutingFlowKey(row.alert_type);
+                const isStockVariance = row.alert_type === "stock_variance";
+                return (
+                  <div key={row.id} className="mobile-data-card space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">{row.alert_type}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {WHATSAPP_ROUTING_FLOW_LABELS[flowKey]}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={severityTone(row.severity)}>
+                        {row.severity}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{row.message}</p>
+                    {row.expected_value != null && (
+                      <div className="rounded-md border border-border bg-muted/30 p-3 text-xs tabular">
+                        <div>
+                          {isStockVariance ? "System" : "Expected"}: {row.expected_value}
+                          {row.unit ?? ""}
+                        </div>
+                        <div>
+                          {isStockVariance ? "Physical/Reconciled" : "Actual"}: {row.actual_value}
+                          {row.unit ?? ""}
+                        </div>
+                        <div>
+                          Difference: {row.variance_value}
+                          {row.unit ?? ""}
+                        </div>
+                      </div>
+                    )}
+                    <div className="mobile-data-row">
+                      <span>Status</span>
+                      <span>{row.status}</span>
+                    </div>
+                    <div className="mobile-data-row">
+                      <span>WhatsApp</span>
+                      <span>{row.whatsapp_notified_at ? "Notified" : "Not notified"}</span>
+                    </div>
+                    <div className="mobile-data-row">
+                      <span>Created</span>
+                      <span>{new Date(row.created_at).toLocaleString()}</span>
+                    </div>
+                    <ResolveDialog alertId={row.id} disabled={row.status !== "open"} />
+                  </div>
+                );
+              })
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

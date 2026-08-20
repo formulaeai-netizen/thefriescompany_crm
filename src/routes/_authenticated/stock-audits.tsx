@@ -164,90 +164,160 @@ function AuditDetail({ auditId }: { auditId: string }) {
         </div>
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Item</TableHead>
-            <TableHead>System Stock</TableHead>
-            {isStaffOnly && !staffSubmitted && <TableHead>Your Count</TableHead>}
-            {isAdminOrModerator && !mgmtSubmitted && <TableHead>Management Count</TableHead>}
-            {isAdmin && readyToReconcile && <TableHead>Reconciled</TableHead>}
-            {isAdmin && readyToReconcile && <TableHead>Reason</TableHead>}
-            {(locked || (!isStaffOnly && !isAdminOrModerator)) && <TableHead>Reconciled</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((item: any) => (
-            <TableRow key={item.id}>
-              <TableCell className="text-xs">
-                {item.item_name_snapshot} {item.unit_snapshot ? `(${item.unit_snapshot})` : ""}
-              </TableCell>
-              <TableCell className="text-xs tabular">{item.system_quantity_snapshot}</TableCell>
-              {isStaffOnly && !staffSubmitted && (
-                <TableCell>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="h-8 w-24"
-                    value={staffCounts[item.id] ?? ""}
-                    onChange={(e) => setStaffCounts((c) => ({ ...c, [item.id]: e.target.value }))}
-                  />
-                </TableCell>
+      <div className="desktop-table overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Item</TableHead>
+              <TableHead>System Stock</TableHead>
+              {isStaffOnly && !staffSubmitted && <TableHead>Your Count</TableHead>}
+              {isAdminOrModerator && !mgmtSubmitted && <TableHead>Management Count</TableHead>}
+              {isAdmin && readyToReconcile && <TableHead>Reconciled</TableHead>}
+              {isAdmin && readyToReconcile && <TableHead>Reason</TableHead>}
+              {(locked || (!isStaffOnly && !isAdminOrModerator)) && (
+                <TableHead>Reconciled</TableHead>
               )}
-              {isAdminOrModerator && !mgmtSubmitted && (
-                <TableCell>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="h-8 w-24"
-                    value={mgmtCounts[item.id] ?? ""}
-                    onChange={(e) => setMgmtCounts((c) => ({ ...c, [item.id]: e.target.value }))}
-                  />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item: any) => (
+              <TableRow key={item.id}>
+                <TableCell className="text-xs">
+                  {item.item_name_snapshot} {item.unit_snapshot ? `(${item.unit_snapshot})` : ""}
                 </TableCell>
-              )}
-              {isAdmin && readyToReconcile && (
-                <>
+                <TableCell className="text-xs tabular">{item.system_quantity_snapshot}</TableCell>
+                {isStaffOnly && !staffSubmitted && (
                   <TableCell>
                     <Input
                       type="number"
                       min="0"
                       step="0.01"
                       className="h-8 w-24"
-                      value={reconciledCounts[item.id] ?? ""}
-                      onChange={(e) =>
-                        setReconciledCounts((c) => ({ ...c, [item.id]: e.target.value }))
-                      }
+                      value={staffCounts[item.id] ?? ""}
+                      onChange={(e) => setStaffCounts((c) => ({ ...c, [item.id]: e.target.value }))}
                     />
                   </TableCell>
+                )}
+                {isAdminOrModerator && !mgmtSubmitted && (
                   <TableCell>
                     <Input
-                      className="h-8 w-40"
-                      placeholder="Reason if different"
-                      value={reconciledReasons[item.id] ?? ""}
-                      onChange={(e) =>
-                        setReconciledReasons((c) => ({ ...c, [item.id]: e.target.value }))
-                      }
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="h-8 w-24"
+                      value={mgmtCounts[item.id] ?? ""}
+                      onChange={(e) => setMgmtCounts((c) => ({ ...c, [item.id]: e.target.value }))}
                     />
                   </TableCell>
-                </>
-              )}
-              {(locked || (!isStaffOnly && !isAdminOrModerator)) && (
-                <TableCell className="text-xs tabular text-muted-foreground">
-                  {item.reconciled_quantity ?? "—"}
-                  {item.variance_quantity != null && Number(item.variance_quantity) !== 0 && (
-                    <span className="ml-1 text-warning">
-                      ({item.variance_quantity > 0 ? "+" : ""}
-                      {item.variance_quantity})
-                    </span>
-                  )}
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                )}
+                {isAdmin && readyToReconcile && (
+                  <>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="h-8 w-24"
+                        value={reconciledCounts[item.id] ?? ""}
+                        onChange={(e) =>
+                          setReconciledCounts((c) => ({ ...c, [item.id]: e.target.value }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        className="h-8 w-40"
+                        placeholder="Reason if different"
+                        value={reconciledReasons[item.id] ?? ""}
+                        onChange={(e) =>
+                          setReconciledReasons((c) => ({ ...c, [item.id]: e.target.value }))
+                        }
+                      />
+                    </TableCell>
+                  </>
+                )}
+                {(locked || (!isStaffOnly && !isAdminOrModerator)) && (
+                  <TableCell className="text-xs tabular text-muted-foreground">
+                    {item.reconciled_quantity ?? "—"}
+                    {item.variance_quantity != null && Number(item.variance_quantity) !== 0 && (
+                      <span className="ml-1 text-warning">
+                        ({item.variance_quantity > 0 ? "+" : ""}
+                        {item.variance_quantity})
+                      </span>
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="mobile-card-list px-0">
+        {items.map((item: any) => (
+          <div key={item.id} className="mobile-data-card space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="font-semibold">
+                {item.item_name_snapshot} {item.unit_snapshot ? `(${item.unit_snapshot})` : ""}
+              </div>
+              <span className="tabular text-sm text-muted-foreground">
+                System {item.system_quantity_snapshot}
+              </span>
+            </div>
+            {isStaffOnly && !staffSubmitted && (
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Your count"
+                value={staffCounts[item.id] ?? ""}
+                onChange={(e) => setStaffCounts((c) => ({ ...c, [item.id]: e.target.value }))}
+              />
+            )}
+            {isAdminOrModerator && !mgmtSubmitted && (
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Management count"
+                value={mgmtCounts[item.id] ?? ""}
+                onChange={(e) => setMgmtCounts((c) => ({ ...c, [item.id]: e.target.value }))}
+              />
+            )}
+            {isAdmin && readyToReconcile && (
+              <div className="grid gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Reconciled quantity"
+                  value={reconciledCounts[item.id] ?? ""}
+                  onChange={(e) =>
+                    setReconciledCounts((c) => ({ ...c, [item.id]: e.target.value }))
+                  }
+                />
+                <Input
+                  placeholder="Reason if different"
+                  value={reconciledReasons[item.id] ?? ""}
+                  onChange={(e) =>
+                    setReconciledReasons((c) => ({ ...c, [item.id]: e.target.value }))
+                  }
+                />
+              </div>
+            )}
+            {(locked || (!isStaffOnly && !isAdminOrModerator)) && (
+              <div className="mobile-data-row">
+                <span>Reconciled</span>
+                <span>
+                  {item.reconciled_quantity ?? "-"}
+                  {item.variance_quantity != null && Number(item.variance_quantity) !== 0
+                    ? ` (${item.variance_quantity > 0 ? "+" : ""}${item.variance_quantity})`
+                    : ""}
+                </span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {isStaffOnly && !staffSubmitted && !locked && (
@@ -340,56 +410,98 @@ function StockAuditsPage() {
         <CardHeader>
           <CardTitle className="text-base">Audit Sessions</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Facility</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
+        <CardContent className="p-0">
+          <div className="desktop-table overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
-                    No audit sessions yet.
-                  </TableCell>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Facility</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                rows.map((row: any) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-xs">{row.audit_date}</TableCell>
-                    <TableCell className="text-xs">{row.audit_type}</TableCell>
-                    <TableCell className="text-xs">{row.facility_name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={statusTone(row.status)}>
-                        {row.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            Open
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Audit Detail</DialogTitle>
-                          </DialogHeader>
-                          <AuditDetail auditId={row.id} />
-                          <DialogFooter />
-                        </DialogContent>
-                      </Dialog>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No audit sessions yet.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  rows.map((row: any) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="text-xs">{row.audit_date}</TableCell>
+                      <TableCell className="text-xs">{row.audit_type}</TableCell>
+                      <TableCell className="text-xs">{row.facility_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={statusTone(row.status)}>
+                          {row.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline">
+                              Open
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Audit Detail</DialogTitle>
+                            </DialogHeader>
+                            <AuditDetail auditId={row.id} />
+                            <DialogFooter />
+                          </DialogContent>
+                        </Dialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mobile-card-list">
+            {rows.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No audit sessions yet.
+              </div>
+            ) : (
+              rows.map((row: any) => (
+                <div key={row.id} className="mobile-data-card space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{row.audit_date}</div>
+                      <div className="text-xs text-muted-foreground">{row.facility_name}</div>
+                    </div>
+                    <Badge variant="outline" className={statusTone(row.status)}>
+                      {row.status}
+                    </Badge>
+                  </div>
+                  <div className="mobile-data-row">
+                    <span>Type</span>
+                    <span>{row.audit_type}</span>
+                  </div>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">Open Audit</Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Audit Detail</DialogTitle>
+                      </DialogHeader>
+                      <AuditDetail auditId={row.id} />
+                      <DialogFooter />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

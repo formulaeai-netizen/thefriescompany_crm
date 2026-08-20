@@ -31,6 +31,7 @@ export type ReminderInvoice = {
   amount: number | string | null;
   amount_received: number | string | null;
   payment_status: string | null;
+  receiving_status?: string | null;
   is_deleted: boolean | null;
   clients?: {
     id: string | null;
@@ -70,7 +71,13 @@ export type SendableReminder = Omit<ReminderInsert, "status"> & {
   status: ReminderStatus;
   invoices: Pick<
     ReminderInvoice,
-    "id" | "invoice_no" | "amount" | "amount_received" | "payment_status" | "due_date"
+    | "id"
+    | "invoice_no"
+    | "amount"
+    | "amount_received"
+    | "payment_status"
+    | "due_date"
+    | "receiving_status"
   > | null;
   clients: {
     id: string | null;
@@ -132,8 +139,12 @@ function toFiniteNumber(value: number | string | null | undefined): number {
 }
 
 export function calculateOutstandingAmount(
-  invoice: Pick<ReminderInvoice, "amount" | "amount_received" | "payment_status">,
+  invoice: Pick<
+    ReminderInvoice,
+    "amount" | "amount_received" | "payment_status" | "receiving_status"
+  >,
 ): number {
+  if (invoice.receiving_status === "awaiting_receiving") return 0;
   if (invoice.payment_status === "Done") return 0;
   return Math.max(toFiniteNumber(invoice.amount) - toFiniteNumber(invoice.amount_received), 0);
 }
@@ -192,6 +203,11 @@ export function buildEligibleReminderRows(
 
   for (const invoice of invoices) {
     if (invoice.is_deleted) {
+      skippedCount++;
+      continue;
+    }
+
+    if (invoice.receiving_status === "awaiting_receiving") {
       skippedCount++;
       continue;
     }
@@ -276,6 +292,9 @@ function isReminderStillEligible(reminder: SendableReminder): { ok: boolean; rea
   const client = reminder.clients;
   if (!invoice) return { ok: false, reason: "invoice_missing" };
   if (!client) return { ok: false, reason: "client_missing" };
+  if (invoice.receiving_status === "awaiting_receiving") {
+    return { ok: false, reason: "awaiting_receiving_after_queue" };
+  }
   if (invoice.payment_status === "Done") return { ok: false, reason: "invoice_paid_after_queue" };
   if (calculateOutstandingAmount(invoice) <= 0)
     return { ok: false, reason: "zero_outstanding_after_queue" };
@@ -420,7 +439,7 @@ export class SupabaseReminderRepository implements ReminderRepository {
     const { data, error } = await this.supabase
       .from("invoices")
       .select(
-        "id, invoice_no, client_id, date, delivery_date, due_date, amount, amount_received, payment_status, is_deleted, clients(id, legal_name, phone, phone_normalized, whatsapp_opt_out, reminders_paused)",
+        "id, invoice_no, client_id, date, delivery_date, due_date, amount, amount_received, payment_status, receiving_status, is_deleted, clients(id, legal_name, phone, phone_normalized, whatsapp_opt_out, reminders_paused)",
       )
       .or("is_deleted.is.null,is_deleted.eq.false");
     if (error) throw new Error(`Invoice scan failed: ${error.message}`);
@@ -450,7 +469,7 @@ export class SupabaseReminderRepository implements ReminderRepository {
     const { data, error } = await this.supabase
       .from("invoice_reminders")
       .select(
-        "id, invoice_id, client_id, due_date_snapshot, outstanding_amount_snapshot, recipient_phone, normalized_recipient_phone, provider, channel, reminder_stage, status, idempotency_key, scheduled_for, invoices(id, invoice_no, amount, amount_received, payment_status, due_date), clients(id, legal_name, whatsapp_opt_out, reminders_paused)",
+        "id, invoice_id, client_id, due_date_snapshot, outstanding_amount_snapshot, recipient_phone, normalized_recipient_phone, provider, channel, reminder_stage, status, idempotency_key, scheduled_for, invoices(id, invoice_no, amount, amount_received, payment_status, receiving_status, due_date), clients(id, legal_name, whatsapp_opt_out, reminders_paused)",
       )
       .in("status", statuses)
       .order("scheduled_for", { ascending: true, nullsFirst: true })

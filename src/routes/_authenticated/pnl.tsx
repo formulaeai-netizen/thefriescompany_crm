@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { fetchInvoices, fetchExpenses } from "@/lib/queries";
 import { pkr } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,8 @@ import {
 } from "recharts";
 import { EXPENSE_GROUPS, GROUP_NAMES, GROUP_COLORS } from "@/lib/expense-categories";
 import { CashInHandBreakdownCard } from "@/components/cash-in-hand-breakdown-card";
+import { AccountBalancesCard } from "@/components/account-balances-card";
+import { getProfitAndLossSummary } from "@/lib/financial-accounts.functions";
 
 export const Route = createFileRoute("/_authenticated/pnl")({
   head: () => ({ meta: [{ title: "P&L — TFC CRM" }] }),
@@ -33,6 +36,7 @@ function monthKey(d: Date) {
 function PnlPage() {
   const { data: invoices = [] } = useQuery({ queryKey: ["invoices"], queryFn: fetchInvoices });
   const { data: expenses = [] } = useQuery({ queryKey: ["expenses"], queryFn: fetchExpenses });
+  const pnlFn = useServerFn(getProfitAndLossSummary);
 
   const today = new Date();
   // Determine months to show: March, April, May, June + current month if newer
@@ -52,8 +56,8 @@ function PnlPage() {
     revenue: number;
     collected: number;
     expenses: number;
-    grossProfit: number;
-    netCollected: number;
+    revenueLessExpenses: number;
+    collectedLessExpenses: number;
     hasUnknown: boolean;
   };
 
@@ -75,8 +79,8 @@ function PnlPage() {
       revenue,
       collected,
       expenses: exp,
-      grossProfit: revenue - exp,
-      netCollected: collected - exp,
+      revenueLessExpenses: revenue - exp,
+      collectedLessExpenses: collected - exp,
       hasUnknown,
     };
   });
@@ -85,11 +89,19 @@ function PnlPage() {
     month: r.label,
     Revenue: r.revenue,
     Expenses: r.expenses,
-    "Gross Profit": r.grossProfit,
+    "Revenue Less Expenses": r.revenueLessExpenses,
   }));
 
   // Current month breakdown by group vs revenue
   const currentKey = monthKey(today);
+  const currentStart = `${currentKey}-01`;
+  const currentEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+    .toISOString()
+    .slice(0, 10);
+  const canonicalPnlQ = useQuery({
+    queryKey: ["canonical-pnl", currentStart, currentEnd],
+    queryFn: () => pnlFn({ data: { start_date: currentStart, end_date: currentEnd } }),
+  });
   const currentRow = rows.find((r) => r.month === currentKey);
   const breakdownByGroup = GROUP_NAMES.map((g) => ({
     name: g,
@@ -107,9 +119,47 @@ function PnlPage() {
       <div>
         <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Profit & Loss</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Monthly revenue, collections, expenses and cash-in-hand.
+          Canonical P&L, account balances and legacy cash collection views.
         </p>
       </div>
+
+      <AccountBalancesCard />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Truthful P&L Policy</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-5">
+          {canonicalPnlQ.isError ? (
+            <div className="md:col-span-5 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              Could not load canonical P&L: {(canonicalPnlQ.error as Error)?.message}
+            </div>
+          ) : (
+            <>
+              <PnlMetric label="Revenue" value={Number(canonicalPnlQ.data?.revenue ?? 0)} />
+              <PnlMetric
+                label="Operating Expenses"
+                value={Number(canonicalPnlQ.data?.operating_expenses ?? 0)}
+              />
+              <PnlMetric
+                label="Payroll Expense"
+                value={Number(canonicalPnlQ.data?.payroll_expense ?? 0)}
+              />
+              <PnlMetric
+                label="Net Profit"
+                value={Number(canonicalPnlQ.data?.net_profit ?? 0)}
+                emphasize
+              />
+              <div className="rounded-md border border-warning/40 bg-warning/5 p-3 text-xs text-muted-foreground">
+                COGS/Gross Profit: {canonicalPnlQ.data?.cogs_status ?? "not available"}
+              </div>
+              <div className="md:col-span-5 text-xs text-muted-foreground">
+                {canonicalPnlQ.data?.policy}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <CashInHandBreakdownCard />
 
@@ -162,32 +212,32 @@ function PnlPage() {
                   ))}
                 </tr>
                 <tr className="border-b border-border/40">
-                  <td className="px-4 py-3 font-semibold">Gross Profit</td>
+                  <td className="px-4 py-3 font-semibold">Revenue Less Expenses</td>
                   {rows.map((r) => (
                     <td
                       key={r.month}
                       className={`px-4 py-3 text-right font-semibold ${
-                        r.grossProfit >= 0 ? "text-primary" : "text-foreground"
+                        r.revenueLessExpenses >= 0 ? "text-primary" : "text-foreground"
                       }`}
                     >
-                      {pkr(r.grossProfit)}
+                      {pkr(r.revenueLessExpenses)}
                     </td>
                   ))}
                 </tr>
                 <tr>
-                  <td className="px-4 py-3 font-semibold">Net Profit</td>
+                  <td className="px-4 py-3 font-semibold">Collected Less Expenses</td>
                   {rows.map((r) => (
                     <td
                       key={r.month}
                       className={`px-4 py-3 text-right font-semibold ${
                         r.hasUnknown
                           ? "text-muted-foreground"
-                          : r.netCollected >= 0
+                          : r.collectedLessExpenses >= 0
                             ? "text-primary"
                             : "text-foreground"
                       }`}
                     >
-                      {r.hasUnknown ? "—" : pkr(r.netCollected)}
+                      {r.hasUnknown ? "—" : pkr(r.collectedLessExpenses)}
                     </td>
                   ))}
                 </tr>
@@ -228,12 +278,12 @@ function PnlPage() {
                   </div>
                   <div>
                     <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                      Net Profit
+                      Collected Less Expenses
                     </div>
                     <div
-                      className={`tabular font-semibold ${r.netCollected >= 0 ? "text-primary" : "text-foreground"}`}
+                      className={`tabular font-semibold ${r.collectedLessExpenses >= 0 ? "text-primary" : "text-foreground"}`}
                     >
-                      {r.hasUnknown ? "—" : pkr(r.netCollected)}
+                      {r.hasUnknown ? "—" : pkr(r.collectedLessExpenses)}
                     </div>
                   </div>
                 </div>
@@ -245,7 +295,7 @@ function PnlPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Revenue vs Expenses vs Gross Profit</CardTitle>
+          <CardTitle className="text-base">Revenue vs Expenses vs Revenue Less Expenses</CardTitle>
         </CardHeader>
         <CardContent className="h-80">
           <ResponsiveContainer width="100%" height="100%">
@@ -270,7 +320,7 @@ function PnlPage() {
               <Bar dataKey="Expenses" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
               <Line
                 type="monotone"
-                dataKey="Gross Profit"
+                dataKey="Revenue Less Expenses"
                 stroke="var(--gold-bright)"
                 strokeWidth={2}
                 dot
@@ -366,6 +416,25 @@ function PnlPage() {
         Note: May and June invoices currently show payment status as "Unknown" — collected cash is
         pending backfill.
       </p>
+    </div>
+  );
+}
+
+function PnlMetric({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: number;
+  emphasize?: boolean;
+}) {
+  return (
+    <div className={`rounded-md border p-3 ${emphasize ? "border-primary/40 bg-primary/5" : ""}`}>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`tabular mt-1 text-lg font-semibold ${value >= 0 ? "text-primary" : ""}`}>
+        {pkr(value)}
+      </div>
     </div>
   );
 }

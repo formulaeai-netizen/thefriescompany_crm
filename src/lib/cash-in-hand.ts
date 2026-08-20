@@ -42,6 +42,7 @@ export type CashInHandInputs = {
   inventoryPurchasesPaidTotal: number;
   paidSalariesTotal: number;
   salaryAdvancesPaidTotal: number;
+  accountTransfersTotal: number;
   adjustmentsTotal: number;
 };
 
@@ -50,7 +51,7 @@ export type CashInHandInputs = {
  * advances as their own distinguishable, always-cash-affecting term):
  *   opening_balance + approved client-payment credits - expenses
  *   - paid inventory purchases - paid salaries - salary advances paid
- *   + explicit admin adjustments
+ *   + account transfers net effect + explicit admin adjustments
  *
  * This mirrors public.get_cash_in_hand_summary() exactly - every term now
  * comes from cash_ledger_entries (a single canonical source), not from
@@ -64,6 +65,7 @@ export function calculateCashInHand(inputs: CashInHandInputs): number {
     (Number(inputs.inventoryPurchasesPaidTotal) || 0) -
     (Number(inputs.paidSalariesTotal) || 0) -
     (Number(inputs.salaryAdvancesPaidTotal) || 0) +
+    (Number(inputs.accountTransfersTotal) || 0) +
     (Number(inputs.adjustmentsTotal) || 0)
   );
 }
@@ -75,6 +77,7 @@ export type CashInHandSummary = {
   inventory_purchases_paid_total: number;
   paid_salaries_total: number;
   salary_advances_paid_total: number;
+  account_transfers_total: number;
   adjustments_total: number;
   cash_in_hand: number;
 };
@@ -87,6 +90,7 @@ export type CashInHandDisplayRow = {
     | "inventory_purchases_paid_total"
     | "paid_salaries_total"
     | "salary_advances_paid_total"
+    | "account_transfers_total"
     | "adjustments_total"
     | "cash_in_hand";
   label: string;
@@ -118,6 +122,11 @@ export function buildCashInHandDisplayRows(summary: CashInHandSummary): CashInHa
       key: "salary_advances_paid_total",
       label: "Salary Advances Paid",
       value: -summary.salary_advances_paid_total,
+    },
+    {
+      key: "account_transfers_total",
+      label: "Cash / Bank Transfers",
+      value: summary.account_transfers_total,
     },
     { key: "adjustments_total", label: "Adjustments", value: summary.adjustments_total },
     {
