@@ -2,7 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { createCustomerPortalOrder, getCustomerPortal } from "@/lib/customer-portal.functions";
+import {
+  createCustomerPortalOrder,
+  getCustomerPortal,
+  validateCustomerPortalOrderDraft,
+  type CustomerPortalOrderFieldErrors,
+} from "@/lib/customer-portal.functions";
 export const Route = createFileRoute("/portal/orders")({ component: PortalOrders });
 function PortalOrders() {
   const get = useServerFn(getCustomerPortal),
@@ -12,17 +17,52 @@ function PortalOrders() {
   const [branch, setBranch] = useState("");
   const [date, setDate] = useState("");
   const [items, setItems] = useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = useState<CustomerPortalOrderFieldErrors>({});
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const m = useMutation({
     mutationFn: (data: any) => create({ data }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["customer-portal"] }),
+    onSuccess: async ({ id }) => {
+      const refreshed = await qc.fetchQuery({ queryKey: ["customer-portal"], queryFn: () => get({}) });
+      const order = (refreshed as any)?.orders?.find((candidate: any) => candidate.id === id);
+      setSuccessMessage(
+        order?.order_number ? `Order ${order.order_number} submitted for review.` : "Order submitted for review.",
+      );
+      setBranch("");
+      setDate("");
+      setItems({});
+      setFieldErrors({});
+    },
   });
-  if (!q.data) return <p>Loading orders...</p>;
+  if (q.isLoading) return <p>Loading orders...</p>;
+  if (q.isError || !q.data) return <p className="rounded border border-destructive p-3 text-destructive">Orders could not be loaded. Please refresh and try again.</p>;
   const d: any = q.data;
+  const submit = () => {
+    const payload = {
+      branch_id: branch,
+      requested_delivery_date: date,
+      items: d.products
+        .filter((p: any) => Number(items[p.id]) > 0)
+        .map((p: any) => ({
+          product_id: p.id,
+          quantity: Number(items[p.id]),
+          unit: "packs",
+        })),
+    };
+    const errors = validateCustomerPortalOrderDraft(payload);
+    setSuccessMessage(null);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    m.mutate(payload);
+  };
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Orders</h1>
+      {successMessage && <p className="rounded border border-green-600 p-3 text-green-700">{successMessage}</p>}
+      {m.isError && <p className="rounded border border-destructive p-3 text-destructive">{m.error instanceof Error ? m.error.message : "Order could not be submitted."}</p>}
       <div className="space-y-3 rounded border p-3">
+        <label className="block text-sm font-medium" htmlFor="portal-order-branch">Branch</label>
         <select
+          id="portal-order-branch"
           className="w-full rounded border p-2"
           value={branch}
           onChange={(e) => setBranch(e.target.value)}
@@ -34,12 +74,16 @@ function PortalOrders() {
             </option>
           ))}
         </select>
+        {fieldErrors.branch_id && <p className="text-sm text-destructive">{fieldErrors.branch_id}</p>}
+        <label className="block text-sm font-medium" htmlFor="portal-order-date">Requested delivery date</label>
         <input
+          id="portal-order-date"
           className="w-full rounded border p-2"
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
+        {fieldErrors.requested_delivery_date && <p className="text-sm text-destructive">{fieldErrors.requested_delivery_date}</p>}
         {d.products.map((p: any) => (
           <label key={p.id} className="flex justify-between gap-3 text-sm">
             {p.name}
@@ -52,22 +96,11 @@ function PortalOrders() {
             />
           </label>
         ))}
+        {fieldErrors.items && <p className="text-sm text-destructive">{fieldErrors.items}</p>}
         <button
           className="w-full rounded bg-primary p-2 text-primary-foreground"
           disabled={m.isPending}
-          onClick={() =>
-            m.mutate({
-              branch_id: branch,
-              requested_delivery_date: date,
-              items: d.products
-                .filter((p: any) => Number(items[p.id]) > 0)
-                .map((p: any) => ({
-                  product_id: p.id,
-                  quantity: Number(items[p.id]),
-                  unit: "packs",
-                })),
-            })
-          }
+          onClick={submit}
         >
           Submit for review
         </button>
