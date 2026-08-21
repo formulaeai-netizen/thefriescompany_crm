@@ -17,6 +17,8 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -51,6 +53,7 @@ import { useIsAdmin } from "@/lib/roles";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { downloadCsv, parseCsvToRecords, toCsv } from "@/lib/csv";
+import { adjustPacketsToAvailable, type InvoiceStockShortage } from "@/lib/invoice-stock-gate";
 
 export const Route = createFileRoute("/_authenticated/invoices/")({
   head: () => ({ meta: [{ title: "Invoices - TFC CRM" }] }),
@@ -509,9 +512,19 @@ function InvoicesPage() {
                         : "-"}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Badge variant="outline" className={statusBadge(i.payment_status)}>
-                        {i.payment_status}
-                      </Badge>
+                      <div className="flex flex-col items-center gap-1">
+                        <Badge variant="outline" className={statusBadge(i.payment_status)}>
+                          {i.payment_status}
+                        </Badge>
+                        {i.stock_gate_status === "forced_shortage" && (
+                          <Badge
+                            variant="outline"
+                            className="border-destructive/40 text-destructive"
+                          >
+                            Stock Override
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {isAdmin && (
@@ -598,9 +611,16 @@ function InvoicesPage() {
               <span className="font-mono text-xs font-bold text-primary break-all">
                 {i.invoice_no}
               </span>
-              <Badge variant="outline" className={statusBadge(i.payment_status)}>
-                {i.payment_status}
-              </Badge>
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant="outline" className={statusBadge(i.payment_status)}>
+                  {i.payment_status}
+                </Badge>
+                {i.stock_gate_status === "forced_shortage" && (
+                  <Badge variant="outline" className="border-destructive/40 text-destructive">
+                    Stock Override
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="min-w-0 text-sm font-semibold text-foreground">
               <div className="truncate">{i.clients?.legal_name}</div>
@@ -705,12 +725,15 @@ function NewInvoiceDialog({
   const [unitPrice, setUnitPrice] = useState("");
   const [weightKg, setWeightKg] = useState("");
   const [noOfPacks, setNoOfPacks] = useState("");
-  const [item, setItem] = useState("");
+  const [productId, setProductId] = useState("");
   const [addingNewBranch, setAddingNewBranch] = useState(false);
   const [newBranchName, setNewBranchName] = useState("");
   const [addingNewFlavor, setAddingNewFlavor] = useState(false);
   const [newFlavorName, setNewFlavorName] = useState("");
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [shortages, setShortages] = useState<InvoiceStockShortage[]>([]);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
@@ -739,7 +762,7 @@ function NewInvoiceDialog({
     },
     onSuccess: (row) => {
       qc.invalidateQueries({ queryKey: ["products"] });
-      setItem(row.name);
+      setProductId(row.id);
       setAddingNewFlavor(false);
       setNewFlavorName("");
       toast.success(`Added ${row.name}`);
@@ -749,6 +772,25 @@ function NewInvoiceDialog({
 
   const client = clients.find((c) => c.id === clientId);
   const branches = client?.branches ?? [];
+  const selectedProduct = products.find((product) => product.id === productId);
+  const availabilityQ = useQuery({
+    queryKey: ["finished-stock-availability", productId],
+    enabled: !!productId,
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("finished_stock_availability", {
+        _product_ids: [productId],
+      });
+      if (error) throw error;
+      return (data?.[0] ?? null) as {
+        product_id: string;
+        product_name: string;
+        available_packets: number;
+      } | null;
+    },
+  });
 
   const addBranch = useMutation({
     mutationFn: async (name: string) => {
@@ -793,7 +835,13 @@ function NewInvoiceDialog({
   const weightInvalid = weightKg !== "" && (!Number.isFinite(wtNum) || wtNum <= 0);
   const packsInvalid = noOfPacks !== "" && (!Number.isFinite(packsNum) || packsNum <= 0);
   const canSubmit =
-    !!clientId && !!item && wtNum > 0 && !weightInvalid && !packsInvalid && finalAmount > 0;
+    !!clientId &&
+    !!selectedProduct &&
+    wtNum > 0 &&
+    packsNum > 0 &&
+    !weightInvalid &&
+    !packsInvalid &&
+    finalAmount > 0;
 
   const handleWeightChange = (value: string) => {
     setWeightKg(value);
@@ -807,34 +855,56 @@ function NewInvoiceDialog({
     setWeightKg(formatQuantityInput(nextPacks * PACK_SIZE_KG));
   };
 
-  const submit = async () => {
+  const submit = async (forceOverride = false, reason = "") => {
     if (!clientId) return toast.error("Pick a client");
-    if (!item) return toast.error("Pick an item");
+    if (!selectedProduct) return toast.error("Pick an item");
     if (wtNum <= 0) return toast.error("Enter weight in kg");
+    if (packsNum <= 0) return toast.error("Enter packet quantity");
     if (!finalAmount || finalAmount <= 0)
       return toast.error("Enter weight + unit price, or a total amount");
-    const insertPayload: any = {
-      client_id: clientId,
-      branch_id: branchId || null,
-      amount: finalAmount,
-      unit_price: upNum > 0 ? upNum : null,
-      weight_kg: wtNum > 0 ? wtNum : null,
-      no_of_packs: packsNum > 0 ? packsNum : null,
-      item,
-      date: deliveryDate,
-      delivery_date: deliveryDate,
-      due_date: calculateInvoiceDueDate(deliveryDate),
-      payment_status: "Not Done",
-    };
-    const { data, error } = await supabase
-      .from("invoices")
-      .insert(insertPayload)
-      .select("invoice_no")
-      .single();
-    if (error) return toast.error(error.message);
-    toast.success(`Created ${data?.invoice_no ?? "invoice"}`);
-    qc.invalidateQueries({ queryKey: ["invoices"] });
-    onDone();
+    if (forceOverride && !reason.trim()) return toast.error("Override reason is required");
+    setSubmitting(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("create_stock_gated_invoice", {
+        _client_id: clientId,
+        _branch_id: branchId || null,
+        _date: deliveryDate,
+        _delivery_date: deliveryDate,
+        _due_date: calculateInvoiceDueDate(deliveryDate),
+        _amount: finalAmount,
+        _amount_received: 0,
+        _payment_status: "Not Done",
+        _lines: [
+          {
+            product_id: selectedProduct.id,
+            requested_packets: packsNum,
+          },
+        ],
+        _unit_price: upNum > 0 ? upNum : null,
+        _force_override: forceOverride,
+        _override_reason: forceOverride ? reason.trim() : null,
+      });
+      if (error) throw error;
+      if (!data?.ok && data?.code === "INSUFFICIENT_FINISHED_STOCK") {
+        setShortages((data.shortages ?? []) as InvoiceStockShortage[]);
+        setOverrideReason("");
+        await availabilityQ.refetch();
+        return;
+      }
+      toast.success(
+        forceOverride
+          ? `Force-created ${data?.invoice_no ?? "invoice"}`
+          : `Created ${data?.invoice_no ?? "invoice"}`,
+      );
+      setShortages([]);
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      qc.invalidateQueries({ queryKey: ["finished-stock-availability"] });
+      onDone();
+    } catch (error: any) {
+      toast.error(error.message ?? "Invoice creation failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -985,13 +1055,13 @@ function NewInvoiceDialog({
             </div>
           ) : (
             <Select
-              value={item}
+              value={productId}
               onValueChange={(v) => {
                 if (v === "__add_new__") {
                   setAddingNewFlavor(true);
                   return;
                 }
-                setItem(v);
+                setProductId(v);
               }}
             >
               <SelectTrigger>
@@ -999,7 +1069,7 @@ function NewInvoiceDialog({
               </SelectTrigger>
               <SelectContent>
                 {products.map((p) => (
-                  <SelectItem key={p.id} value={p.name}>
+                  <SelectItem key={p.id} value={p.id}>
                     {p.name}
                   </SelectItem>
                 ))}
@@ -1043,6 +1113,20 @@ function NewInvoiceDialog({
               placeholder="Auto"
               className={packsInvalid ? "border-destructive focus-visible:ring-destructive" : ""}
             />
+            <p
+              className={cn(
+                "mt-1 text-xs",
+                availabilityQ.isError ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {!productId
+                ? "Select a product to check stock"
+                : availabilityQ.isFetching && !availabilityQ.data
+                  ? "Checking available packets..."
+                  : availabilityQ.isError
+                    ? "Available stock could not be loaded"
+                    : `Available packets: ${Number(availabilityQ.data?.available_packets ?? 0).toLocaleString()}`}
+            </p>
           </div>
         </div>
         <div>
@@ -1096,13 +1180,103 @@ function NewInvoiceDialog({
         </p>
         <Button
           data-financial-action
-          onClick={submit}
-          disabled={!canSubmit}
+          onClick={() => submit()}
+          disabled={!canSubmit || submitting}
           className="w-full bg-amber-500 text-black hover:bg-amber-600 disabled:opacity-50"
         >
-          Create Invoice
+          {submitting ? "Checking stock..." : "Create Invoice"}
         </Button>
       </div>
+      <Dialog
+        open={shortages.length > 0}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !submitting) {
+            setShortages([]);
+            setOverrideReason("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Not enough packets available</DialogTitle>
+            <DialogDescription>
+              Adjust the invoice quantity or cancel. Only an Admin can force-create it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {shortages.map((shortage) => (
+              <div key={shortage.product_id} className="border-border border-b pb-3 text-sm">
+                <div className="font-medium">{shortage.product}</div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">Available</div>
+                    <div className="mt-1 font-semibold tabular-nums">{shortage.available_qty}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Requested</div>
+                    <div className="mt-1 font-semibold tabular-nums">{shortage.requested_qty}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Shortfall</div>
+                    <div className="text-destructive mt-1 font-semibold tabular-nums">
+                      {shortage.shortfall_qty}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {isAdmin && (
+              <div>
+                <Label htmlFor="stock-override-reason">Override reason</Label>
+                <Input
+                  id="stock-override-reason"
+                  value={overrideReason}
+                  onChange={(event) => setOverrideReason(event.target.value)}
+                  placeholder="Required for Force Create"
+                  maxLength={500}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={submitting}
+              onClick={() => {
+                setShortages([]);
+                setOverrideReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={submitting || shortages.length !== 1}
+              onClick={() => {
+                const available = adjustPacketsToAvailable(shortages[0]);
+                setNoOfPacks(formatQuantityInput(available));
+                setWeightKg(formatQuantityInput(available * PACK_SIZE_KG));
+                setShortages([]);
+                setOverrideReason("");
+              }}
+            >
+              Adjust to Available
+            </Button>
+            {isAdmin && (
+              <Button
+                type="button"
+                data-financial-action
+                disabled={submitting || !overrideReason.trim()}
+                onClick={() => submit(true, overrideReason)}
+              >
+                {submitting ? "Creating..." : "Force Create"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DialogContent>
   );
 }
@@ -1121,6 +1295,7 @@ function buildImportRow(
   record: Record<string, string>,
   line: number,
   clients: any[],
+  products: Array<{ id: string; name: string }>,
 ): ImportRowResult {
   const clientName = (record["client"] ?? "").trim();
   const branchName = (record["branch"] ?? "").trim();
@@ -1128,6 +1303,7 @@ function buildImportRow(
   const date = (record["date"] ?? "").trim();
   const dueDateRaw = (record["due date"] ?? "").trim();
   const weightRaw = (record["weight"] ?? "").trim();
+  const packetsRaw = (record["packets"] ?? "").trim();
   const unitPriceRaw = (record["unit price"] ?? "").trim();
   const amountRaw = (record["amount"] ?? "").trim();
   const amountReceivedRaw = (record["amount received"] ?? "").trim();
@@ -1156,6 +1332,8 @@ function buildImportRow(
   }
 
   if (!item) return { line, raw: record, valid: false, error: "Item is required" };
+  const product = products.find((row) => row.name.trim().toLowerCase() === item.toLowerCase());
+  if (!product) return { line, raw: record, valid: false, error: `Product "${item}" not found` };
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return { line, raw: record, valid: false, error: "Date must be in YYYY-MM-DD format" };
   }
@@ -1166,6 +1344,16 @@ function buildImportRow(
   const weight = weightRaw === "" ? null : Number(weightRaw);
   if (weightRaw !== "" && (!Number.isFinite(weight) || (weight as number) <= 0)) {
     return { line, raw: record, valid: false, error: "Weight (kg) must be a positive number" };
+  }
+  const packets =
+    packetsRaw === "" ? (weight == null ? null : weight / PACK_SIZE_KG) : Number(packetsRaw);
+  if (packets == null || !Number.isFinite(packets) || packets <= 0) {
+    return {
+      line,
+      raw: record,
+      valid: false,
+      error: "Packets must be positive, or derivable from Weight (kg)",
+    };
   }
   const unitPrice = unitPriceRaw === "" ? null : Number(unitPriceRaw);
   if (unitPriceRaw !== "" && !Number.isFinite(unitPrice)) {
@@ -1211,11 +1399,13 @@ function buildImportRow(
     payload: {
       client_id: client.id,
       branch_id: branchId,
-      item,
+      product_id: product.id,
+      product_name: product.name,
       date,
       delivery_date: date,
       due_date: dueDate,
       weight_kg: weight,
+      no_of_packs: packets,
       unit_price: unitPrice,
       amount,
       amount_received: amountReceived,
@@ -1239,6 +1429,18 @@ function ImportInvoicesDialog({
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<ImportRowResult[]>([]);
   const [importing, setImporting] = useState(false);
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("products")
+        .select("id,name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string }>;
+    },
+  });
 
   const validRows = rows.filter((r) => r.valid);
   const invalidRows = rows.filter((r) => !r.valid);
@@ -1260,7 +1462,7 @@ function ImportInvoicesDialog({
         setRows([]);
         return;
       }
-      setRows(records.map((record, idx) => buildImportRow(record, idx + 2, clients)));
+      setRows(records.map((record, idx) => buildImportRow(record, idx + 2, clients, products)));
     };
     reader.onerror = () => toast.error("Could not read the file");
     reader.readAsText(file);
@@ -1270,8 +1472,37 @@ function ImportInvoicesDialog({
     if (validRows.length === 0) return;
     setImporting(true);
     try {
-      const { error } = await supabase.from("invoices").insert(validRows.map((r) => r.payload));
-      if (error) throw error;
+      for (const row of validRows) {
+        const payload = row.payload!;
+        const { data, error } = await (supabase as any).rpc("create_stock_gated_invoice", {
+          _client_id: payload.client_id,
+          _branch_id: payload.branch_id,
+          _date: payload.date,
+          _delivery_date: payload.delivery_date,
+          _due_date: payload.due_date,
+          _amount: payload.amount,
+          _amount_received: payload.amount_received,
+          _payment_status: payload.payment_status,
+          _lines: [
+            {
+              product_id: payload.product_id,
+              requested_packets: payload.no_of_packs,
+            },
+          ],
+          _unit_price: payload.unit_price,
+          _force_override: false,
+          _override_reason: null,
+        });
+        if (error) throw error;
+        if (!data?.ok) {
+          const shortage = data?.shortages?.[0];
+          throw new Error(
+            shortage
+              ? `Line ${row.line}: ${shortage.product} requested ${shortage.requested_qty}, available ${shortage.available_qty}`
+              : `Line ${row.line}: invoice stock validation failed`,
+          );
+        }
+      }
       toast.success(`Imported ${validRows.length} invoice${validRows.length === 1 ? "" : "s"}`);
       onImported();
       reset();
@@ -1292,7 +1523,8 @@ function ImportInvoicesDialog({
         "Fryguys Classic Fries",
         "2026-01-15",
         "",
-        "11",
+        "10",
+        "4",
         "1250",
         "",
         "0",
@@ -1317,8 +1549,8 @@ function ImportInvoicesDialog({
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Columns: Client, Branch (optional), Item, Date (YYYY-MM-DD), Due Date (optional, auto
-            +15 days), Weight (kg), Unit Price, Amount (auto if Weight + Unit Price given), Amount
-            Received, Payment Status. Invoice No. is auto-generated and ignored on import.
+            +15 days), Weight (kg), Packets, Unit Price, Amount (auto if Weight + Unit Price given),
+            Amount Received, Payment Status. Invoice No. is auto-generated and ignored on import.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Input
