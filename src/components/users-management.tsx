@@ -1,18 +1,31 @@
 import { useState } from "react";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Ban, CheckCircle2, KeyRound, Settings2, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -21,26 +34,80 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { INTERNAL_USER_ROLES, USER_CREATION_ROLES } from "@/lib/customer-portal-admin";
+import type { AppRole } from "@/lib/roles";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { UserPlus, KeyRound, Ban, CheckCircle2 } from "lucide-react";
-import {
-  listUsersWithRoles,
   createUserWithRole,
-  updateUserRole,
+  listCustomerPortalOptions,
+  listUsersWithRoles,
   resetUserPassword,
   setUserActive,
+  updateCustomerPortalAccess,
+  updateUserRole,
 } from "@/lib/user-admin.functions";
-import type { AppRole } from "@/lib/roles";
 
-const ROLES: AppRole[] = ["admin", "staff", "investor", "moderator"];
+type PortalClient = {
+  id: string;
+  legal_name: string;
+  branches: Array<{ id: string; client_id: string; branch_name: string; city?: string | null }>;
+};
+
+type PortalEdit = {
+  userId: string;
+  email: string;
+  clientId: string;
+  clientLocked: boolean;
+  branchIds: string[];
+  active: boolean;
+};
+
+const emptyForm = {
+  fullName: "",
+  email: "",
+  password: "",
+  role: "staff" as AppRole,
+  clientId: "",
+  branchIds: [] as string[],
+};
+
+function BranchMultiSelect({
+  branches,
+  selected,
+  onChange,
+}: {
+  branches: PortalClient["branches"];
+  selected: string[];
+  onChange: (branchIds: string[]) => void;
+}) {
+  if (branches.length === 0) {
+    return <p className="text-sm text-muted-foreground">This client has no branches.</p>;
+  }
+  return (
+    <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border p-3">
+      {branches.map((branch) => {
+        const checked = selected.includes(branch.id);
+        return (
+          <label key={branch.id} className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox
+              checked={checked}
+              onCheckedChange={(next) =>
+                onChange(
+                  next
+                    ? [...selected, branch.id]
+                    : selected.filter((branchId) => branchId !== branch.id),
+                )
+              }
+            />
+            <span>
+              {branch.branch_name}
+              {branch.city ? ` - ${branch.city}` : ""}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
 
 export function UsersManagement() {
   const qc = useQueryClient();
@@ -49,61 +116,89 @@ export function UsersManagement() {
   const updateRoleFn = useServerFn(updateUserRole);
   const resetFn = useServerFn(resetUserPassword);
   const setActiveFn = useServerFn(setUserActive);
+  const portalOptionsFn = useServerFn(listCustomerPortalOptions);
+  const updatePortalFn = useServerFn(updateCustomerPortalAccess);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => listFn({}),
   });
+  const { data: portalClients = [] } = useQuery({
+    queryKey: ["customer-portal-options"],
+    queryFn: () => portalOptionsFn({}),
+  });
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    role: "staff" as AppRole,
-  });
+  const [form, setForm] = useState(emptyForm);
+  const [portalEdit, setPortalEdit] = useState<PortalEdit | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
 
   const createMut = useMutation({
-    mutationFn: (data: typeof form) => createFn({ data }),
+    mutationFn: (data: typeof form) =>
+      createFn({ data: { ...data, clientId: data.clientId || null } }),
     onSuccess: () => {
       toast.success(`User created (${form.email})`, {
         description: `Temp password: ${form.password}`,
       });
       setOpen(false);
-      setForm({ fullName: "", email: "", password: "", role: "staff" });
+      setForm(emptyForm);
       invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to create user"),
+    onError: (error: any) => toast.error(error?.message ?? "Failed to create user"),
   });
 
   const updateRoleMut = useMutation({
-    mutationFn: (v: { userId: string; role: AppRole }) => updateRoleFn({ data: v }),
+    mutationFn: (value: { userId: string; role: (typeof INTERNAL_USER_ROLES)[number] }) =>
+      updateRoleFn({ data: value }),
     onSuccess: () => {
       toast.success("Role updated");
       invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to update role"),
+    onError: (error: any) => toast.error(error?.message ?? "Failed to update role"),
   });
 
   const setActiveMut = useMutation({
-    mutationFn: (v: { userId: string; active: boolean }) => setActiveFn({ data: v }),
-    onSuccess: (_, v) => {
-      toast.success(v.active ? "User reactivated" : "User deactivated");
+    mutationFn: (value: { userId: string; active: boolean }) => setActiveFn({ data: value }),
+    onSuccess: (_, value) => {
+      toast.success(value.active ? "User reactivated" : "User deactivated");
       invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+    onError: (error: any) => toast.error(error?.message ?? "Failed"),
   });
 
-  const resetPw = async (email: string) => {
+  const updatePortalMut = useMutation({
+    mutationFn: (data: PortalEdit) =>
+      updatePortalFn({
+        data: {
+          userId: data.userId,
+          clientId: data.clientId || null,
+          branchIds: data.branchIds,
+          active: data.active,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Portal access updated");
+      setPortalEdit(null);
+      invalidate();
+    },
+    onError: (error: any) => toast.error(error?.message ?? "Failed to update portal access"),
+  });
+
+  const resetPassword = async (email: string) => {
     try {
       await resetFn({ data: { email } });
       toast.success(`Password reset link sent to ${email}`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Failed");
     }
   };
+
+  const clients = portalClients as PortalClient[];
+  const createClient = clients.find((client) => client.id === form.clientId);
+  const editClient = clients.find((client) => client.id === portalEdit?.clientId);
+  const customerFormInvalid =
+    form.role === "customer" && (!form.clientId || form.branchIds.length === 0);
 
   return (
     <Card>
@@ -116,7 +211,7 @@ export function UsersManagement() {
               Add User
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add User</DialogTitle>
             </DialogHeader>
@@ -125,7 +220,7 @@ export function UsersManagement() {
                 <Label>Full Name</Label>
                 <Input
                   value={form.fullName}
-                  onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                  onChange={(event) => setForm({ ...form, fullName: event.target.value })}
                 />
               </div>
               <div>
@@ -133,7 +228,7 @@ export function UsersManagement() {
                 <Input
                   type="email"
                   value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  onChange={(event) => setForm({ ...form, email: event.target.value })}
                 />
               </div>
               <div>
@@ -141,7 +236,7 @@ export function UsersManagement() {
                 <Input
                   type="text"
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
                   placeholder="min 8 characters"
                 />
               </div>
@@ -149,29 +244,70 @@ export function UsersManagement() {
                 <Label>Role</Label>
                 <Select
                   value={form.role}
-                  onValueChange={(v) => setForm({ ...form, role: v as AppRole })}
+                  onValueChange={(role) =>
+                    setForm({
+                      ...form,
+                      role: role as AppRole,
+                      clientId: role === "customer" ? form.clientId : "",
+                      branchIds: role === "customer" ? form.branchIds : [],
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ROLES.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
+                    {USER_CREATION_ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              {form.role === "customer" && (
+                <div className="space-y-3 rounded-md border p-3">
+                  <div>
+                    <Label>Customer / Client</Label>
+                    <Select
+                      value={form.clientId}
+                      onValueChange={(clientId) => setForm({ ...form, clientId, branchIds: [] })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.legal_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Allowed Branches</Label>
+                    <BranchMultiSelect
+                      branches={createClient?.branches ?? []}
+                      selected={form.branchIds}
+                      onChange={(branchIds) => setForm({ ...form, branchIds })}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button
                 disabled={
-                  createMut.isPending || !form.fullName || !form.email || form.password.length < 8
+                  createMut.isPending ||
+                  !form.fullName ||
+                  !form.email ||
+                  form.password.length < 8 ||
+                  customerFormInvalid
                 }
                 onClick={() => createMut.mutate(form)}
               >
-                {createMut.isPending ? "Creating…" : "Create User"}
+                {createMut.isPending ? "Creating..." : "Create User"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -179,7 +315,7 @@ export function UsersManagement() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         ) : (
           <Table>
             <TableHeader>
@@ -193,34 +329,43 @@ export function UsersManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(users as any[]).map((u) => {
-                const currentRole = (u.roles?.[0] ?? "staff") as AppRole;
+              {(users as any[]).map((user) => {
+                const currentRole = (user.roles?.[0] ?? "staff") as AppRole;
                 return (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.full_name || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.full_name || "-"}</TableCell>
+                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
                     <TableCell>
-                      <Select
-                        value={currentRole}
-                        onValueChange={(v) =>
-                          updateRoleMut.mutate({ userId: u.id, role: v as AppRole })
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ROLES.map((r) => (
-                            <SelectItem key={r} value={r}>
-                              {r}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {currentRole === "customer" ? (
+                        <Badge variant="outline">customer</Badge>
+                      ) : (
+                        <Select
+                          value={currentRole}
+                          onValueChange={(role) =>
+                            updateRoleMut.mutate({
+                              userId: user.id,
+                              role: role as (typeof INTERNAL_USER_ROLES)[number],
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {INTERNAL_USER_ROLES.map((role) => (
+                              <SelectItem key={role} value={role}>
+                                {role}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </TableCell>
                     <TableCell>
-                      {u.is_active === false ? (
+                      {user.is_active === false ? (
                         <Badge variant="destructive">Inactive</Badge>
+                      ) : currentRole === "customer" && user.portalAccess?.active === false ? (
+                        <Badge variant="secondary">Portal disabled</Badge>
                       ) : (
                         <Badge variant="outline" className="border-emerald-500/50 text-emerald-500">
                           Active
@@ -228,13 +373,33 @@ export function UsersManagement() {
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
+                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : "-"}
                     </TableCell>
                     <TableCell className="text-right">
+                      {currentRole === "customer" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setPortalEdit({
+                              userId: user.id,
+                              email: user.email,
+                              clientId: user.portalAccess?.clientId ?? "",
+                              clientLocked: Boolean(user.portalAccess?.clientId),
+                              branchIds: user.portalAccess?.branchIds ?? [],
+                              active: user.portalAccess?.active ?? true,
+                            })
+                          }
+                          title="Edit portal access"
+                        >
+                          <Settings2 className="mr-1 h-4 w-4" />
+                          Portal Access
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => resetPw(u.email)}
+                        onClick={() => resetPassword(user.email)}
                         title="Send reset link"
                       >
                         <KeyRound className="h-4 w-4" />
@@ -243,11 +408,14 @@ export function UsersManagement() {
                         size="sm"
                         variant="ghost"
                         onClick={() =>
-                          setActiveMut.mutate({ userId: u.id, active: u.is_active === false })
+                          setActiveMut.mutate({
+                            userId: user.id,
+                            active: user.is_active === false,
+                          })
                         }
-                        title={u.is_active === false ? "Reactivate" : "Deactivate"}
+                        title={user.is_active === false ? "Reactivate" : "Deactivate"}
                       >
-                        {u.is_active === false ? (
+                        {user.is_active === false ? (
                           <CheckCircle2 className="h-4 w-4" />
                         ) : (
                           <Ban className="h-4 w-4" />
@@ -261,6 +429,76 @@ export function UsersManagement() {
           </Table>
         )}
       </CardContent>
+
+      <Dialog open={Boolean(portalEdit)} onOpenChange={(next) => !next && setPortalEdit(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Portal Access</DialogTitle>
+          </DialogHeader>
+          {portalEdit && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{portalEdit.email}</p>
+              <div>
+                <Label>Customer / Client</Label>
+                <Select
+                  value={portalEdit.clientId}
+                  disabled={portalEdit.clientLocked}
+                  onValueChange={(clientId) =>
+                    setPortalEdit({ ...portalEdit, clientId, branchIds: [] })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.legal_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Allowed Branches</Label>
+                <BranchMultiSelect
+                  branches={editClient?.branches ?? []}
+                  selected={portalEdit.branchIds}
+                  onChange={(branchIds) => setPortalEdit({ ...portalEdit, branchIds })}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div>
+                  <div className="text-sm font-medium">Portal access</div>
+                  <div className="text-xs text-muted-foreground">
+                    Disabling keeps the user and business history intact.
+                  </div>
+                </div>
+                <Switch
+                  checked={portalEdit.active}
+                  onCheckedChange={(active) => setPortalEdit({ ...portalEdit, active })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPortalEdit(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                !portalEdit ||
+                updatePortalMut.isPending ||
+                !portalEdit.clientId ||
+                (portalEdit.active && portalEdit.branchIds.length === 0)
+              }
+              onClick={() => portalEdit && updatePortalMut.mutate(portalEdit)}
+            >
+              {updatePortalMut.isPending ? "Saving..." : "Save Portal Access"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

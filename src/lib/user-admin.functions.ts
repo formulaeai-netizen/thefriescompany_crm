@@ -1,8 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  assertBranchesBelongToClient,
+  normalizeBranchIds,
+  validatePortalAssignment,
+} from "@/lib/customer-portal-admin";
 
-const roleEnum = z.enum(["admin", "staff", "investor", "moderator"]);
+const roleEnum = z.enum(["admin", "staff", "investor", "moderator", "customer"]);
+const internalRoleEnum = z.enum(["admin", "staff", "investor", "moderator"]);
 
 async function assertAdmin(ctx: any) {
   const { data: isAdmin, error } = await ctx.supabase.rpc("has_role", {
@@ -18,6 +24,8 @@ const createSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
   role: roleEnum,
+  clientId: z.string().uuid().nullable().optional(),
+  branchIds: z.array(z.string().uuid()).max(200).optional(),
 });
 
 export const createUserWithRole = createServerFn({ method: "POST" })
@@ -26,6 +34,26 @@ export const createUserWithRole = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const portal = validatePortalAssignment({
+      role: data.role,
+      clientId: data.clientId,
+      branchIds: data.branchIds,
+    });
+    if (data.role === "customer") {
+      const { data: client, error: clientError } = await (context.supabase as any)
+        .from("clients")
+        .select("id")
+        .eq("id", portal.clientId)
+        .maybeSingle();
+      if (clientError || !client) throw new Error("Selected customer / client does not exist");
+      const { data: branches, error: branchError } = await (context.supabase as any)
+        .from("branches")
+        .select("id,client_id")
+        .in("id", portal.branchIds);
+      if (branchError) throw new Error(`Branch validation failed: ${branchError.message}`);
+      assertBranchesBelongToClient(portal.clientId!, portal.branchIds, branches ?? []);
+    }
 
     const created = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
@@ -36,23 +64,43 @@ export const createUserWithRole = createServerFn({ method: "POST" })
     if (created.error) throw new Error(created.error.message);
     const userId = created.data.user?.id;
     if (!userId) throw new Error("Could not create user");
+    try {
+      // Profile is auto-created by trigger; ensure full_name is set.
+      const { error: profileError } = await (supabaseAdmin as any)
+        .from("profiles")
+        .upsert({ id: userId, full_name: data.fullName, email: data.email });
+      if (profileError) throw new Error(`Profile creation failed: ${profileError.message}`);
 
-    // Profile is auto-created by trigger; ensure full_name is set.
-    await (supabaseAdmin as any)
-      .from("profiles")
-      .upsert({ id: userId, full_name: data.fullName, email: data.email });
+      const { error: roleErr } = await (supabaseAdmin as any)
+        .from("user_roles")
+        .upsert({ user_id: userId, role: data.role }, { onConflict: "user_id,role" });
+      if (roleErr) throw new Error(`Role assignment failed: ${roleErr.message}`);
 
-    const { error: roleErr } = await (supabaseAdmin as any)
-      .from("user_roles")
-      .upsert({ user_id: userId, role: data.role }, { onConflict: "user_id,role" });
-    if (roleErr) throw new Error(`Role assignment failed: ${roleErr.message}`);
+      if (data.role === "customer") {
+        const { error: portalError } = await (context.supabase as any).rpc(
+          "set_customer_portal_access",
+          {
+            _user_id: userId,
+            _client_id: portal.clientId,
+            _branch_ids: portal.branchIds,
+            _is_active: true,
+          },
+        );
+        if (portalError) throw new Error(`Portal access creation failed: ${portalError.message}`);
+      }
 
-    return { ok: true, userId };
+      return { ok: true, userId };
+    } catch (error) {
+      // Auth creation is outside the database transaction. Compensate so a
+      // failed role/portal mapping never leaves a partial login behind.
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => undefined);
+      throw error;
+    }
   });
 
 const updateRoleSchema = z.object({
   userId: z.string().uuid(),
-  role: roleEnum,
+  role: internalRoleEnum,
 });
 
 export const updateUserRole = createServerFn({ method: "POST" })
@@ -107,6 +155,78 @@ export const setUserActive = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const listCustomerPortalOptions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { data, error } = await (context.supabase as any)
+      .from("clients")
+      .select("id,legal_name,branches(id,client_id,branch_name,city)")
+      .order("legal_name");
+    if (error) throw new Error(`Customer list failed: ${error.message}`);
+    return (data ?? []).map((client: any) => ({
+      id: client.id,
+      legal_name: client.legal_name,
+      branches: [...(client.branches ?? [])].sort((left: any, right: any) =>
+        String(left.branch_name).localeCompare(String(right.branch_name)),
+      ),
+    }));
+  });
+
+const portalAccessSchema = z.object({
+  userId: z.string().uuid(),
+  clientId: z.string().uuid().nullable().optional(),
+  branchIds: z.array(z.string().uuid()).max(200),
+  active: z.boolean(),
+});
+
+export const updateCustomerPortalAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => portalAccessSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const branchIds = normalizeBranchIds(data.branchIds);
+    if (data.active && branchIds.length === 0) {
+      throw new Error("Select at least one allowed branch");
+    }
+
+    const { data: identity, error: identityError } = await (context.supabase as any)
+      .from("customer_portal_identities")
+      .select("user_id,client_id")
+      .eq("user_id", data.userId)
+      .maybeSingle();
+    if (identityError) throw new Error(`Portal identity lookup failed: ${identityError.message}`);
+    const clientId = identity?.client_id ?? data.clientId;
+    if (!clientId) throw new Error("Select a customer / client");
+
+    const { data: customerRole, error: roleError } = await (context.supabase as any)
+      .from("user_roles")
+      .select("user_id")
+      .eq("user_id", data.userId)
+      .eq("role", "customer")
+      .maybeSingle();
+    if (roleError) throw new Error(`Customer role lookup failed: ${roleError.message}`);
+    if (!customerRole) throw new Error("Target user must have the customer role");
+
+    if (branchIds.length > 0) {
+      const { data: branches, error: branchError } = await (context.supabase as any)
+        .from("branches")
+        .select("id,client_id")
+        .in("id", branchIds);
+      if (branchError) throw new Error(`Branch validation failed: ${branchError.message}`);
+      assertBranchesBelongToClient(clientId, branchIds, branches ?? []);
+    }
+
+    const { error } = await (context.supabase as any).rpc("set_customer_portal_access", {
+      _user_id: data.userId,
+      _client_id: clientId,
+      _branch_ids: branchIds,
+      _is_active: data.active,
+    });
+    if (error) throw new Error(`Portal access update failed: ${error.message}`);
+    return { ok: true };
+  });
+
 export const listUsersWithRoles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -122,6 +242,16 @@ export const listUsersWithRoles = createServerFn({ method: "GET" })
       .select("user_id, role");
     if (rErr) throw new Error(rErr.message);
 
+    const [{ data: identities, error: identityError }, { data: branchAccess, error: accessError }] =
+      await Promise.all([
+        (context.supabase as any)
+          .from("customer_portal_identities")
+          .select("user_id,client_id,is_active"),
+        (context.supabase as any).from("customer_portal_branch_access").select("user_id,branch_id"),
+      ]);
+    if (identityError) throw new Error(`Portal identity list failed: ${identityError.message}`);
+    if (accessError) throw new Error(`Portal branch list failed: ${accessError.message}`);
+
     const roleMap = new Map<string, string[]>();
     for (const r of roleRows ?? []) {
       const arr = roleMap.get(r.user_id) ?? [];
@@ -129,8 +259,23 @@ export const listUsersWithRoles = createServerFn({ method: "GET" })
       roleMap.set(r.user_id, arr);
     }
 
+    const identityMap = new Map<string, any>(
+      (identities ?? []).map((row: any) => [row.user_id, row]),
+    );
+    const branchMap = new Map<string, string[]>();
+    for (const access of branchAccess ?? []) {
+      branchMap.set(access.user_id, [...(branchMap.get(access.user_id) ?? []), access.branch_id]);
+    }
+
     return (profiles ?? []).map((p: any) => ({
       ...p,
       roles: roleMap.get(p.id) ?? [],
+      portalAccess: identityMap.has(p.id)
+        ? {
+            clientId: identityMap.get(p.id).client_id,
+            active: identityMap.get(p.id).is_active,
+            branchIds: branchMap.get(p.id) ?? [],
+          }
+        : null,
     }));
   });
