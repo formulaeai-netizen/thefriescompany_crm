@@ -93,7 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "Fry Guys CRM" },
       {
         name: "description",
@@ -283,8 +283,8 @@ function TopBar() {
     navigate({ to: "/auth", replace: true });
   };
   return (
-    <header className="sticky top-0 z-30 flex min-h-[56px] items-center justify-between border-b border-border bg-background/95 px-3 py-2 backdrop-blur sm:min-h-[64px] sm:px-4 sm:py-3 lg:px-8">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="sticky top-0 z-30 flex min-h-[56px] items-center justify-between border-b border-border bg-background/95 px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] backdrop-blur sm:min-h-[64px] sm:px-4 sm:py-3 lg:px-8">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex" />
         <div className="min-w-0">
           <h1 className="font-display truncate text-lg font-medium leading-tight text-foreground sm:text-xl">
@@ -297,7 +297,7 @@ function TopBar() {
           )}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         <button
           type="button"
           onClick={() => setCmdOpen(true)}
@@ -316,7 +316,7 @@ function TopBar() {
         <img
           src="/logo.png"
           alt="The Fries Company"
-          className="ml-1 h-8 w-8 rounded-full object-contain sm:ml-2 sm:h-9 sm:w-9"
+          className="ml-0.5 h-7 w-7 rounded-full object-contain sm:ml-2 sm:h-9 sm:w-9"
         />
       </div>
     </header>

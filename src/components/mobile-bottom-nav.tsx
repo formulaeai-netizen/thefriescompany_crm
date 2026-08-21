@@ -114,12 +114,12 @@ export function MobileBottomNav() {
           </SheetTrigger>
           <SheetContent
             side="bottom"
-            className="max-h-[82vh] rounded-t-xl px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-5"
+            className="max-h-[88dvh] rounded-t-xl px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-5"
           >
             <SheetHeader className="text-left">
               <SheetTitle>More</SheetTitle>
             </SheetHeader>
-            <div className="mt-4 grid grid-cols-2 gap-2 overflow-y-auto pb-2">
+            <div className="mt-4 grid max-h-[calc(88dvh-5.5rem-env(safe-area-inset-bottom))] grid-cols-2 gap-2 overflow-y-auto pb-2">
               {items.map((item) => {
                 const active = isActiveNavItem(pathname, item);
                 return (
@@ -127,14 +127,14 @@ export function MobileBottomNav() {
                     key={item.url}
                     to={item.url}
                     onClick={() => setOpen(false)}
-                    className={`flex min-h-12 items-center gap-3 rounded-md border px-3 text-sm ${
+                    className={`flex min-h-14 items-center gap-3 rounded-md border px-3 py-2 text-sm ${
                       active
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border bg-card text-foreground"
                     }`}
                   >
                     <item.icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{item.title}</span>
+                    <span className="min-w-0 text-pretty leading-tight">{item.title}</span>
                   </Link>
                 );
               })}
