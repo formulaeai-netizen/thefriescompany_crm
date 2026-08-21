@@ -37,6 +37,7 @@ export class WhatsAppWebProvider implements WhatsAppProvider {
   private senderMasked: string | null = null;
   private lifecycleState: WhatsAppLifecycleEvent | null = null;
   private lastAckStatus: WhatsAppAckStatus | null = null;
+  private processExitTelemetryAttached = false;
 
   constructor(private readonly options: WhatsAppWebProviderOptions) {}
 
@@ -77,6 +78,14 @@ export class WhatsAppWebProvider implements WhatsAppProvider {
       this.connected = false;
       this.lastError = `Chromium exited (code=${code ?? "null"}, signal=${signal ?? "null"})`;
       this.logLifecycle("browser_exit", { code, signal });
+    });
+  }
+
+  private attachProcessExitTelemetry(): void {
+    if (this.processExitTelemetryAttached) return;
+    this.processExitTelemetryAttached = true;
+    process.once("exit", (code) => {
+      this.logLifecycle("process_exit", { code });
     });
   }
 
@@ -209,6 +218,7 @@ export class WhatsAppWebProvider implements WhatsAppProvider {
     this.client.on("authenticated", () => {
       this.lastHeartbeat = new Date().toISOString();
       this.logLifecycle("authenticated");
+      this.attachBrowserExitTelemetry();
       console.info("WhatsApp Web session authenticated.");
     });
 
@@ -231,7 +241,9 @@ export class WhatsAppWebProvider implements WhatsAppProvider {
       console.warn(this.lastError);
     });
 
+    this.attachProcessExitTelemetry();
     await this.client.initialize();
+    this.attachBrowserExitTelemetry();
   }
 
   async disconnect(): Promise<void> {
