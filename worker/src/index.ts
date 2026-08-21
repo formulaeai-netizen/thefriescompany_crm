@@ -19,6 +19,8 @@ import {
   SupabaseCustomerOrderRepository,
 } from "./services/inbound-customer-orders.js";
 
+const WORKER_KEEP_ALIVE_MS = 60_000;
+
 function createProvider(config: ReturnType<typeof loadWorkerConfig>): WhatsAppProvider {
   if (!config.automationEnabled) return new DisabledWhatsAppProvider();
   if (config.provider === "meta-cloud") return new MetaCloudProvider(config.allowRealSend);
@@ -38,9 +40,11 @@ async function main() {
   let stopInboundListener: (() => void) | null = null;
   let stopExpenseIntakeListener: (() => void) | null = null;
   let stopCustomerOrderListener: (() => void) | null = null;
+  const keepAlive = setInterval(() => undefined, WORKER_KEEP_ALIVE_MS);
 
   const shutdown = async (signal: string) => {
     console.info(`${signal} received. Stopping scheduler and disconnecting provider...`);
+    clearInterval(keepAlive);
     scheduler?.stop();
     stopInboundListener?.();
     stopExpenseIntakeListener?.();
