@@ -4,7 +4,7 @@ import test from "node:test";
 import { loadWorkerConfig } from "./config.js";
 import { DisabledWhatsAppProvider } from "./providers/disabled-whatsapp.provider.js";
 import { MetaCloudProvider } from "./providers/meta-cloud.provider.js";
-import { assertRealSendAllowed, type WhatsAppProvider } from "./providers/whatsapp-provider.js";
+import { assertRealSendAllowed, mapWhatsAppAckStatus, type WhatsAppProvider } from "./providers/whatsapp-provider.js";
 import { WhatsAppWebProvider } from "./providers/whatsapp-web.provider.js";
 import {
   buildEligibleReminderRows,
@@ -24,6 +24,16 @@ function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => T): T {
 
 test("sending is blocked by default", () => {
   assert.throws(() => assertRealSendAllowed(false), /Real WhatsApp sending is blocked/);
+});
+
+test("maps WhatsApp ACK codes without claiming handset delivery for server ACK", () => {
+  assert.equal(mapWhatsAppAckStatus(-1), "ACK_ERROR");
+  assert.equal(mapWhatsAppAckStatus(0), "ACK_PENDING");
+  assert.equal(mapWhatsAppAckStatus(1), "ACK_SERVER");
+  assert.equal(mapWhatsAppAckStatus(2), "ACK_DEVICE");
+  assert.equal(mapWhatsAppAckStatus(3), "ACK_READ");
+  assert.equal(mapWhatsAppAckStatus(4), "ACK_PLAYED");
+  assert.equal(mapWhatsAppAckStatus("unknown"), null);
 });
 
 test("invalid config is rejected", () => {
@@ -230,7 +240,7 @@ test("WhatsAppWebProvider returns direct provider id when sendMessage returns on
   assert.equal(result.providerMessageId, "direct-provider-id");
   assert.equal(client.sendCalls, 1);
   assert.equal(client.listenerCount("message_create"), 0);
-  assert.equal(client.listenerCount("message_ack"), 0);
+  assert.equal(client.listenerCount("message_ack"), 1);
 });
 
 test("WhatsAppWebProvider succeeds from matching event when direct return is empty", async () => {
@@ -281,5 +291,5 @@ test("WhatsAppWebProvider removes per-send listeners across duplicate sends", as
 
   assert.equal(client.sendCalls, 2);
   assert.equal(client.listenerCount("message_create"), 0);
-  assert.equal(client.listenerCount("message_ack"), 0);
+  assert.equal(client.listenerCount("message_ack"), 2);
 });

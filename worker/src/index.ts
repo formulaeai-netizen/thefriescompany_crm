@@ -56,7 +56,14 @@ async function main() {
   process.once("SIGINT", () => void shutdown("SIGINT"));
   process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
-  await provider.initialize();
+  try {
+    await provider.initialize();
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown WhatsApp provider startup error";
+    console.error("WhatsApp provider initialization failed; worker will remain online without WhatsApp", {
+      error: message,
+    });
+  }
   const whatsappClient = (provider as any).client;
   if (config.automationEnabled && whatsappClient) {
     stopInboundListener = startInboundPaymentListener(
