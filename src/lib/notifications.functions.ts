@@ -122,7 +122,19 @@ export const registerPushSubscription = createServerFn({ method: "POST" })
       _platform: data.platform ?? null,
     });
     if (error) throw new Error(`Push subscription register failed: ${error.message}`);
-    return { ok: true, id };
+    const { count, error: verifyError } = await (context.supabase as any)
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", context.userId)
+      .eq("active", true)
+      .is("revoked_at", null);
+    if (verifyError) {
+      throw new Error(`Push subscription verify failed: ${verifyError.message}`);
+    }
+    if (!count) {
+      throw new Error("Push subscription was not persisted.");
+    }
+    return { ok: true, id, activeSubscriptionCount: count };
   });
 
 export const revokePushSubscription = createServerFn({ method: "POST" })

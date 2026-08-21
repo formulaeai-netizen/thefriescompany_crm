@@ -48,12 +48,34 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+function arrayBufferToBase64Url(buffer: ArrayBuffer | null) {
+  if (!buffer) return "";
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function getRootServiceWorkerRegistration() {
+  let registration = await navigator.serviceWorker.getRegistration("/");
+  if (!registration) {
+    registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  }
+  await navigator.serviceWorker.ready;
+  return registration;
+}
+
 function subscriptionPayload(subscription: PushSubscription) {
   const json = subscription.toJSON();
+  const p256dh = json.keys?.p256dh ?? arrayBufferToBase64Url(subscription.getKey("p256dh"));
+  const auth = json.keys?.auth ?? arrayBufferToBase64Url(subscription.getKey("auth"));
+  if (!subscription.endpoint || !p256dh || !auth) {
+    throw new Error("Browser did not return a complete push subscription.");
+  }
   return {
     endpoint: json.endpoint ?? subscription.endpoint,
-    p256dh: json.keys?.p256dh ?? "",
-    auth: json.keys?.auth ?? "",
+    p256dh,
+    auth,
     user_agent: navigator.userAgent,
     platform: navigator.platform,
   };
@@ -114,7 +136,7 @@ export function NotificationSettings() {
         await updatePrefsFn({ data: next });
         return { enabled: false };
       }
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await getRootServiceWorkerRegistration();
       const existing = await registration.pushManager.getSubscription();
       const subscription =
         existing ??
@@ -142,7 +164,7 @@ export function NotificationSettings() {
   const disableMutation = useMutation({
     mutationFn: async () => {
       if (pushSupported) {
-        const registration = await navigator.serviceWorker.ready;
+        const registration = await getRootServiceWorkerRegistration();
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
           await revokeFn({ data: { endpoint: subscription.endpoint } });
