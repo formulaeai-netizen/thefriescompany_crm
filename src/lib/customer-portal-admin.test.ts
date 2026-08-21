@@ -66,6 +66,17 @@ test("database contract keeps portal access Admin-only and disables without dele
   assert.doesNotMatch(sql, /DELETE FROM public\.customer_portal_identities/);
 });
 
+test("portal access RPC uses the privileged role helper for target users", () => {
+  const sql = readFileSync(
+    new URL(
+      "../../supabase/migrations/20260821180000_customer_portal_admin_role_check.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(sql, /authz\.has_role\(_user_id, 'customer'/);
+});
+
 test("Admin user creation and management UI wire the customer portal assignment", () => {
   const server = readFileSync(new URL("./user-admin.functions.ts", import.meta.url), "utf8");
   const ui = readFileSync(new URL("../components/users-management.tsx", import.meta.url), "utf8");
